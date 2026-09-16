@@ -1,48 +1,54 @@
-# 地球史书 EarthChronicle · v0.3.3
+# 地球史书 EarthChronicle
 
-在 Windows 本地阅读、整理按地点和年份组织的历史资料，也可开启内容服务器供网页阅读。
+地球史书是按地点与时间浏览历史资料的 Windows 桌面软件，支持 3D 地球、平面地图、文明历史、地球演化和个人事件记录。可选的内容服务器提供局域网网页阅读。
 
-## 启动与退出
+桌面程序使用 .NET Framework / WinForms 和 WebView2，地图使用 CesiumJS，本地服务使用 Node.js，资料保存在 SQLite 数据库中。
 
-双击 **启动地球史书.cmd** 或 **EarthChronicle.exe** 打开软件。软件使用 Windows 原生窗口与 WebView2。
+## 从源码构建
 
-点击 **−** 正常最小化，窗口保留在任务栏；正常显示和最小化时不显示托盘图标。点击 **X** 隐藏到系统托盘，内容服务器继续运行。双击托盘图标重新打开；右键托盘图标选择 **退出软件**，或双击 **停止地球史书.cmd**，结束本地软件及内容服务器。使用 `EarthChronicle.exe --background` 可直接在托盘后台启动。
+环境要求：Windows 10/11 x64、.NET Framework 4.8、WebView2 Evergreen Runtime，以及 PowerShell、curl、tar。WebView2 Runtime 可从 [Microsoft 官方页面](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)获取。
 
-隐藏与恢复使用同一个窗口，不再重建窗口。
-
-## 网页阅读
-
-在本地 **设置 → 内容服务器** 中开启网页访问并选择端口，默认 8080。通过给出的地址打开网页。网页为只读，只能调整当前浏览器的外观与布局；端口、数据库管理及个人记录编辑仅在本地软件中提供。普通浏览器访问本机地址也不会获得管理权限。
-
-**启动局域网共享.cmd** 可启动软件并开启保存的内容服务器端口。程序不会自动更改 Windows 防火墙规则。
-
-## 资料与备份
-
-运行资料统一保存在 **data/chronicle.sqlite**，包含内置历史、地点、地质切片、个人记录、本地显示偏好及内容服务器配置。内置历史与地质资料只读，个人记录可新增、编辑和删除。
-
-在本地 **设置 → 数据库** 导出或导入 `.sqlite` 文件。导入合并个人记录并保留较新修改，恢复本地显示设置，保留当前机器的内容服务器开关和端口。
-
-顶部 **文明历史 / 地球演化** 切换阅读内容。时间轴拖动上沿调整高度，侧栏拖动分隔线调整宽度；面板隐藏与恢复统一通过 **设置 → 外观与显示 → 显示选项** 控制。地图区域已移除收起列表、收起详情、现代地表参考、Müller2019 浮签及查看全部地点按钮，资料来源保留在详情和“关于资料”中。
-
-需要查看全部地点时，在事件列表的地点筛选中选择 **全部**，时间范围选择 **整个篇章**，再点击地图的全景按钮。到达时间范围边界后，相应方向的跳转按钮禁用；重复跳转到当前年份不会改变选中事件或地图。详细操作、数据限制和故障排查见 **[v0.3.3 使用说明](docs/windows-v0.3.md)**。历史与地质来源分别见 [历史来源](docs/history-sources.md) 和 [地质来源](docs/geology-sources.md)。旧版文档只供版本参考。
-
-## 开发
-
-Windows 原生外壳使用 .NET Framework 4.8 WinForms 和 WebView2；随包提供 Node.js 24.19.0 与 CesiumJS。WebView2 使用系统已安装的 Evergreen Runtime。
-
-仓库保留源码、固定示例资料、依赖锁定和许可证；运行数据库、备份、浏览器缓存及编译产物不提交。
-
-在 Windows x64 上从源码准备并构建：
+获取仓库后，在项目根目录运行：
 
 ```powershell
-powershell -NoProfile -File desktop/prepare.ps1
-./runtime/node.exe --test tests/*.test.mjs
-powershell -NoProfile -File desktop/test.ps1
-powershell -NoProfile -File desktop/build.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File desktop/prepare.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
 ```
 
-准备脚本从官方分发地址下载固定版本并核对摘要，无需全局安装 Node.js 或包管理器。构建后双击 `EarthChronicle.exe`；使用同目录资源，首次运行自动建立数据库。需要 Windows .NET Framework 4.8 和 WebView2 Evergreen Runtime。
+准备脚本下载并校验 Node.js 24.19.0、CesiumJS 1.145.0 和 WebView2 SDK 1.0.4191.47，无需全局安装 Node.js 或包管理器。首次准备需要网络；可通过 `desktop/prepare.ps1 -CachePath <缓存目录>` 复用已下载的依赖。
 
-`npm start` 启动原生软件；`npm run start:server` 仅启动开发用后端，不会赋予普通浏览器管理权限。详细步骤、离线准备和目录结构见 [开发与构建](docs/开发与构建.md)。[下一阶段设计目标](docs/下一阶段设计目标.md) 描述拟议的 v0.4 范围，尚未实现。
+构建产物为项目根目录的 **EarthChronicle.exe**，双击即可运行。使用时保留同目录的组件、`runtime` 和 `public` 资源；仅复制 EXE 无法运行完整软件。构建脚本不生成安装包。
 
-项目沿用仓库的 [GPL-3.0 许可证](LICENSE)，第三方组件及资料的许可见 [第三方说明](THIRD-PARTY-NOTICES.md)。
+窗口、地图、个人记录、网页访问及数据库备份的操作方法见 [使用说明](docs/使用说明.md)。
+
+## 基础资料与数据库
+
+仓库中的 `public/data/` 包含 5 个地点、24 条明初历史事件和 4 个地质切片。首次启动会自动创建 `data/chronicle.sqlite` 并导入这些基础资料，无需手动下载或导入数据库。
+
+运行时，内置资料、个人事件、显示设置和内容服务器配置统一保存在该数据库中。内置资料只读，个人事件可在本地软件中编辑；网页端只读。本机数据库、备份、日志及浏览器缓存不提交到仓库。
+
+## 测试
+
+准备依赖后，在项目根目录运行：
+
+```powershell
+./runtime/node.exe --test tests/*.test.mjs
+powershell -NoProfile -ExecutionPolicy Bypass -File desktop/test.ps1
+```
+
+GitHub Actions 在 Windows 上执行依赖准备、自动测试和 EXE 编译。
+
+## 工程目录
+
+| 路径 | 内容 |
+| --- | --- |
+| `desktop/` | Windows 窗口、依赖准备、构建及更新工具 |
+| `public/` | 界面、地图及初始化资料 |
+| `server.mjs`、`database.mjs` | 本地服务、访问控制与数据库 |
+| `tests/` | 前端、服务、数据库、原生请求及更新工具测试 |
+| `docs/` | 软件使用说明 |
+| `licenses/`、`runtime/LICENSE.txt` | 第三方许可文件 |
+
+## 许可证
+
+项目采用 [GPL-3.0](LICENSE)。第三方组件、地图模型与历史资料的来源见 [第三方组件与资料声明](THIRD-PARTY-NOTICES.md)。
