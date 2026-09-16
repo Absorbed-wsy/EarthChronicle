@@ -12,6 +12,8 @@ const execute = promisify(execFile);
 const windowsOnly = { skip: process.platform !== 'win32' };
 const hash = text => createHash('sha256').update(text).digest('hex');
 const quote = value => "'" + value.replaceAll("'", "''") + "'";
+const windowsShell = () => path.join(process.env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
+const windowsEnv = () => Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'psmodulepath'));
 async function fixture() {
   const root = await mkdtemp(path.join(tmpdir(), 'earthchronicle-update-test-'));
   const target = path.join(root, 'installed'), update = path.join(root, 'update');
@@ -29,14 +31,12 @@ async function fixture() {
       files.push({ path: relative, sha256: hash(contents) });
     },
     async manifest(value = { version: '0.9-test', files }) { await writeFile(path.join(update, 'manifest.json'), JSON.stringify(value)); },
-    async run(prefix = '') {
+    async run(prefix = '', destination = target, script = path.join(update, 'ApplyUpdate.ps1')) {
       try {
-        const command = '[Console]::OutputEncoding = New-Object Text.UTF8Encoding; ' + prefix + '& ' + quote(path.join(update, 'ApplyUpdate.ps1')) + ' -DestinationPath ' + quote(target) + ' -ShutdownTimeoutSeconds 2';
+        const command = '[Console]::OutputEncoding = New-Object Text.UTF8Encoding; ' + prefix + '& ' + quote(script) + ' -DestinationPath ' + quote(destination) + ' -ShutdownTimeoutSeconds 2';
         // A test runner launched from PowerShell 7 can otherwise make Windows
         // PowerShell 5 load incompatible 7.x modules via its inherited path.
-        const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'psmodulepath'));
-        const shell = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32/WindowsPowerShell/v1.0/powershell.exe');
-        const output = await execute(shell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], { windowsHide: true, timeout: 20000, env });
+        const output = await execute(windowsShell(), ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], { windowsHide: true, timeout: 20000, env: windowsEnv() });
         return { code: 0, ...output };
       } catch (error) { return { code: error.code, stdout: error.stdout || '', stderr: error.stderr || '' }; }
     },
@@ -99,6 +99,32 @@ test('valid update backs up all replaced files, preserves personal data and repo
       try { assert.equal(saved.prepare('SELECT note FROM personal').get().note, 'keep my event'); } finally { saved.close(); }
     }
   } finally { await f.cleanup(); }
+});
+
+test('updater normalizes Windows short path aliases and mixed separators before containment checks', windowsOnly, async t => {
+  for (const variant of ['short alias', 'mixed separators']) await t.test(variant, async () => {
+    const f = await fixture();
+    try {
+      await f.payload('server.mjs', 'replacement server'); await f.payload('public/new.js', 'new asset'); await f.manifest();
+      let destination = f.target, prefix = '', script = path.join(f.update, 'ApplyUpdate.ps1');
+      if (variant === 'short alias') {
+        const command = `$fs=New-Object -ComObject Scripting.FileSystemObject; [pscustomobject]@{target=$fs.GetFolder(${quote(f.target)}).ShortPath;script=$fs.GetFile(${quote(script)}).ShortPath}|ConvertTo-Json -Compress`;
+        const result = await execute(windowsShell(), ['-NoProfile', '-NonInteractive', '-Command', command], { windowsHide: true, timeout: 10000, env: windowsEnv() });
+        const aliases = JSON.parse(result.stdout.trim()); destination = aliases.target; script = aliases.script;
+        assert.ok(destination, 'Windows returned a usable folder path');
+        t.diagnostic('short-alias destination: ' + destination);
+      } else {
+        // 8.3 aliases can be disabled on a drive. This variant independently
+        // exercises a different but equivalent root spelling on every runner.
+        prefix = `function Resolve-Path { [CmdletBinding()] param($Path,$LiteralPath) $resolved=Microsoft.PowerShell.Management\\Resolve-Path @PSBoundParameters; foreach($item in $resolved) { if($LiteralPath -eq ${quote(f.target)}) { [pscustomobject]@{Path=$item.Path.Replace('\\','/')} } else { $item } } }; `;
+      }
+      const result = await f.run(prefix, destination, script);
+      assert.equal(result.code, 0, result.stdout + result.stderr);
+      assert.equal(await readFile(path.join(f.target, 'server.mjs'), 'utf8'), 'replacement server');
+      assert.equal(await readFile(path.join(f.target, 'public/new.js'), 'utf8'), 'new asset');
+      assert.equal(await readFile(path.join(f.target, 'data/personal.txt'), 'utf8'), 'keep personal records');
+    } finally { await f.cleanup(); }
+  });
 });
 
 test('a mid-copy failure restores replaced files and removes newly installed files', windowsOnly, async () => {

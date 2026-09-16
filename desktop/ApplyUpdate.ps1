@@ -44,7 +44,10 @@ function Get-ProjectProcesses {
 }
 
 try {
-  $targetPath = (Resolve-Path -LiteralPath $DestinationPath).Path.TrimEnd([IO.Path]::DirectorySeparatorChar)
+  # Resolve-Path retains 8.3 aliases such as RUNNER~1, while .NET Framework
+  # GetFullPath can expand existing child files to long names. Normalize the
+  # existing root with that same API before deriving or comparing any children.
+  $targetPath = [IO.Path]::GetFullPath((Resolve-Path -LiteralPath $DestinationPath).Path).TrimEnd([IO.Path]::DirectorySeparatorChar)
   if (-not (Test-Path -LiteralPath (Join-Path $targetPath 'server.mjs') -PathType Leaf)) { throw 'The existing EarthChronicle project was not found.' }
   $payloadPath = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot 'files'))
   if (-not (Test-Path -LiteralPath $payloadPath -PathType Container)) { throw 'The update payload is missing.' }
