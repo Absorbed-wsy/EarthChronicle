@@ -148,16 +148,20 @@ test('a mid-copy failure restores replaced files and removes newly installed fil
   } finally { await f.cleanup(); }
 });
 
-test('updater waits for a WebView child after its native host exits and leaves files unchanged on timeout', windowsOnly, async () => {
+test('updater waits for a WebView child after its native host exits and leaves files unchanged on timeout', windowsOnly, async t => {
+ for (const variant of ['long executable path', 'short executable path']) await t.test(variant, async () => {
   const f = await fixture();
   try {
     await f.payload('server.mjs', 'replacement server'); await f.manifest();
-    const native = quote(path.join(f.target, 'EarthChronicle.exe'));
+    await writeFile(path.join(f.target, 'EarthChronicle.exe'), 'test placeholder; never executed');
     const quitMarker = quote(path.join(f.root, 'quit-requested.txt'));
     // Simulate process snapshots; no real executable is started or stopped.
-    const processes = `$global:probeCount=0; function Get-CimInstance { param($ClassName,$Filter)
+    // CIM can report either the long path or a short alias used at launch.
+    // Normalize the existing folder before constructing those two variants.
+    const useShortPath = variant === 'short executable path' ? '$global:fixtureNativePath=(New-Object -ComObject Scripting.FileSystemObject).GetFile($global:fixtureNativePath).ShortPath;' : '';
+    const processes = `$global:fixtureNativePath=Join-Path ([IO.Path]::GetFullPath(${quote(f.target)})) 'EarthChronicle.exe'; ${useShortPath} $global:probeCount=0; function Get-CimInstance { param($ClassName,$Filter)
       $global:probeCount++;
-      if ($global:probeCount -eq 1) { [pscustomobject]@{Name='EarthChronicle.exe';ExecutablePath=${native};ProcessId=190001;ParentProcessId=1;CreationDate='2026-01-01';CommandLine=''} }
+      if ($global:probeCount -eq 1) { [pscustomobject]@{Name='EarthChronicle.exe';ExecutablePath=$global:fixtureNativePath;ProcessId=190001;ParentProcessId=1;CreationDate='2026-01-01';CommandLine=''} }
       [pscustomobject]@{Name='msedgewebview2.exe';ExecutablePath='C:\\example\\msedgewebview2.exe';ProcessId=190002;ParentProcessId=190001;CreationDate='2026-01-01';CommandLine=''}
     }; function Start-Process { param($FilePath,$ArgumentList,$WindowStyle,[switch]$PassThru) [IO.File]::WriteAllText(${quitMarker},$ArgumentList) }; `;
     const result = await f.run(processes);
@@ -166,4 +170,5 @@ test('updater waits for a WebView child after its native host exits and leaves f
     assert.equal(await readFile(path.join(f.target, 'server.mjs'), 'utf8'), 'original server');
     assert.ok(!(await readdir(f.target)).includes('backups'));
   } finally { await f.cleanup(); }
+ });
 });

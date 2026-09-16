@@ -16,12 +16,21 @@ function Assert-NoReparsePoint([string]$FilePath, [string]$RootPath) {
   }
 }
 
+function Get-NormalizedExecutablePath($Process) {
+  $executable = [string]$Process.ExecutablePath
+  if (-not $executable) { return '' }
+  # CIM can preserve the short spelling used to launch an executable. An
+  # unrelated inaccessible/invalid path must not block this project's update.
+  try { return [IO.Path]::GetFullPath($executable) } catch { return $executable }
+}
+
 function Get-ProjectProcesses {
   $all = @(Get-CimInstance Win32_Process -Filter "Name='EarthChronicle.exe' OR Name='node.exe' OR Name='msedgewebview2.exe'")
   $selected = @{}
   foreach ($process in $all) {
     $identity = [string]$process.ProcessId + ':' + [string]$process.CreationDate
-    $projectExecutable = $process.ExecutablePath -and ($process.ExecutablePath -eq $nativePath -or $process.ExecutablePath -eq $runtimePath)
+    $executablePath = Get-NormalizedExecutablePath $process
+    $projectExecutable = $executablePath -and ($executablePath -eq $nativePath -or $executablePath -eq $runtimePath)
     $projectWebView = $process.Name -eq 'msedgewebview2.exe' -and $process.CommandLine -and $process.CommandLine.IndexOf($webViewProfile, [StringComparison]::OrdinalIgnoreCase) -ge 0
     if ($projectExecutable -or $projectWebView -or $trackedProcesses.ContainsKey($identity)) {
       $selected[[int]$process.ProcessId] = $process
@@ -99,7 +108,7 @@ try {
   # No application process is touched until the entire payload is valid.
   $trackedProcesses = @{}
   $running = @(Get-ProjectProcesses)
-  if (@($running | Where-Object { $_.ExecutablePath -eq $nativePath }).Count) {
+  if (@($running | Where-Object { (Get-NormalizedExecutablePath $_) -eq $nativePath }).Count) {
     $null = Start-Process -FilePath $nativePath -ArgumentList '--quit' -WindowStyle Hidden -PassThru
   }
   $deadline = [DateTime]::UtcNow.AddSeconds($ShutdownTimeoutSeconds)
