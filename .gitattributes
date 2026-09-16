@@ -1,0 +1,15 @@
+* text=auto
+*.js text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.cs text eol=crlf
+*.geojson text eol=lf
+# Preserve upstream license text, including its whitespace.
+licenses/** -whitespace
+runtime/LICENSE.txt -whitespace
+public/data/geology/License.source.txt -whitespace

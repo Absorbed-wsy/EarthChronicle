@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f4f7f7">
+  <title>地球史书 · Earth Chronicle</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/vendor/cesium/Widgets/widgets.css">
+  <link rel="stylesheet" href="/style.css">
+  <script>window.CESIUM_BASE_URL='/vendor/cesium/';</script>
+  <script defer src="/vendor/cesium/Cesium.js"></script>
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="地球史书首页"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="14"/><ellipse cx="20" cy="20" rx="6" ry="14"/><path d="M6 20h28M9 12h22M9 28h22"/></svg><span><b>地球史书</b><small>EARTH CHRONICLE</small></span></a>
+    <nav class="view-tabs" aria-label="探索视图"><button id="history-tab" class="active" aria-pressed="true">文明历史</button><button id="geology-tab" aria-pressed="false">地球演化</button></nav>
+    <div class="header-actions"><button id="add-button" class="accent-button history-action" disabled hidden><span>＋</span> 记录事件</button><button id="settings-button" class="icon-button" aria-label="设置" title="设置"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 3-.6 2.3-1.5.9-2.3-.6-2.4 4.1 1.7 1.7v1.7l-1.7 1.7 2.4 4.1 2.3-.6 1.5.9.6 2.3h5l.6-2.3 1.5-.9 2.3.6 2.4-4.1-1.7-1.7v-1.7l1.7-1.7-2.4-4.1-2.3.6-1.5-.9L14.5 3Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+  </header>
+  <main class="workspace">
+    <aside id="explorer" class="explorer" aria-label="事件浏览">
+      <div class="explorer-heading"><span class="eyebrow" id="chapter-kicker">CHAPTER 01</span><h1 id="chapter-title">明初，一座城与一个时代</h1><p id="chapter-description" hidden></p></div>
+      <div id="history-controls">
+        <label class="search-box"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><input id="search" type="search" placeholder="搜索事件、城市、年号" aria-label="搜索事件、城市、年号"></label>
+        <div id="city-filters" class="city-filters" aria-label="筛选地点"></div>
+        <div class="filter-row"><select id="scope" aria-label="时间范围"><option value="nearby">前后五年</option><option value="year">这一年</option><option value="all">整个篇章</option></select><select id="category" aria-label="事件类型"><option value="all">全部类型</option><option>建都</option><option>营建</option><option>制度</option><option>文化</option><option>航海</option><option>战争</option></select></div>
+      </div>
+      <div class="list-caption"><span id="list-label">时间中的足迹</span><span id="event-count">—</span></div>
+      <div id="event-list" class="event-list" aria-live="polite"><div class="loading-state">正在打开这部史书…</div></div>
+      <footer class="explorer-footer"><span id="coverage">示例篇章 · 1368—1421</span><button id="sources-button" class="text-button">关于资料 ↗</button></footer>
+    </aside>
+    <div id="explorer-resizer" class="panel-resizer" role="separator" tabindex="0" aria-label="调整事件列表宽度" aria-orientation="vertical" aria-controls="explorer" aria-valuemin="240" aria-valuemax="440" aria-valuenow="300" title="拖动调整列表宽度；也可用左右方向键"></div>
+    <section class="earth-stage" aria-label="交互式地图">
+      <div id="globe"></div>
+      <div id="globe-error" class="globe-error" hidden><b>地球画面暂时无法显示</b><p>请使用支持 WebGL 2 的 Edge 或 Chrome，并开启浏览器硬件加速。事件阅读仍然可用。</p><button id="retry-globe" class="quiet-button">重新载入</button></div>
+      <div class="map-controls" aria-label="地图视角"><button id="map-projection" title="展开为平面地图" aria-label="展开为平面地图" aria-pressed="false" disabled>2D</button><button id="north-view" title="朝北 · 点击恢复北向上" aria-label="朝北" disabled><span class="compass-arrow" aria-hidden="true">▲</span><small aria-hidden="true">N</small></button><button id="home-view" title="返回地球全景" aria-label="返回地球全景">◎</button><button id="zoom-in" title="放大" aria-label="放大">＋</button><button id="zoom-out" title="缩小" aria-label="缩小">−</button><button id="labels-toggle" class="active" title="显示或隐藏地点名称" aria-label="显示或隐藏地点名称" aria-pressed="true">名</button></div>
+    </section>
+    <div id="detail-resizer" class="panel-resizer" role="separator" tabindex="0" aria-label="调整详情面板宽度" aria-orientation="vertical" aria-controls="detail" aria-valuemin="260" aria-valuemax="480" aria-valuenow="324" title="拖动调整详情宽度；也可用左右方向键"></div>
+    <aside id="detail" class="detail" aria-label="事件详情"><div class="detail-empty"><span class="eyebrow">A PLACE IN TIME</span><h2>每个地点，<br>都有一部历史。</h2><p>选择地球上的地点或左侧事件，开始阅读。</p></div></aside>
+    <div id="timeline-resizer" class="timeline-resizer" role="separator" tabindex="0" aria-label="调整时间轴高度" aria-orientation="horizontal" aria-controls="timeline" aria-valuemin="116" aria-valuemax="300" aria-valuenow="156" title="上下拖动调整时间轴高度"></div>
+    <section id="timeline" class="timeline" aria-label="时间轴">
+      <div class="time-display"><span class="eyebrow" id="time-unit">公元 / CE</span><div class="year-line"><input id="year-input" type="number" min="1368" max="1421" value="1405" aria-label="当前年份"><span id="geology-year" hidden>66</span><span id="ma-unit" hidden>Ma</span></div><span id="era-label">明 · 永乐三年</span></div>
+      <div class="timeline-track-section"><div class="timeline-toolbar"><div class="playback"><button id="previous-year" aria-label="前一年" title="前一年">‹</button><button id="play" aria-label="播放时间轴" title="播放时间轴">▶</button><button id="next-year" aria-label="后一年" title="后一年">›</button><span id="timeline-caption" hidden></span></div><div class="timeline-links"><button id="jump-start" class="text-button">篇章起点</button><button id="jump-end" class="text-button">篇章终点</button></div></div><div class="range-wrap"><div id="event-dots" class="event-dots"></div><input id="time-slider" type="range" min="1368" max="1421" value="1405" step="1" aria-label="浏览年份"></div><div id="time-ticks" class="time-ticks"></div></div>
+    </section>
+  </main>
+  <dialog id="event-dialog" class="modal"><form id="event-form"><div class="modal-heading"><div><span class="eyebrow">YOUR CHRONICLE</span><h2>记录一个事件</h2></div><button type="button" data-close="event-dialog" class="close-button" aria-label="关闭">×</button></div><label>事件标题<input name="title" required maxlength="100" placeholder="在这个地方，发生了什么？"></label><div class="form-row"><label>起始年份（公元）<input name="year" type="number" required min="1" max="9999" value="1405"></label><label>结束年份（公元） <span class="optional">可选</span><input name="endYear" type="number" min="1" max="9999" placeholder="持续事件可填写"></label></div><div class="form-row"><label>地点<select name="placeId" id="event-place" required></select></label><label>类型<select name="category"><option>文化</option><option>建都</option><option>营建</option><option>制度</option><option>航海</option><option>战争</option></select></label></div><label>事件记述<textarea name="summary" rows="4" required maxlength="3000" placeholder="事件记述"></textarea></label><label>来源名称<input name="sourceTitle" required maxlength="200" placeholder="书名、文章名或资料机构"></label><label>来源链接 <span class="optional">可选</span><input name="sourceUrl" type="url" placeholder="https://"></label><p id="form-error" class="form-error" role="alert"></p><div class="form-actions"><button type="button" data-close="event-dialog" class="quiet-button">取消</button><button type="submit" class="accent-button">保存</button></div></form></dialog>
+  <dialog id="settings-dialog" class="modal settings-modal" aria-labelledby="settings-title">
+    <div class="modal-heading settings-heading"><h2 id="settings-title">设置</h2><button data-close="settings-dialog" class="close-button" aria-label="关闭设置">×</button></div>
+    <div class="settings-tabs" role="tablist" aria-label="设置分类"><button id="appearance-settings-tab" class="active" role="tab" aria-selected="true" aria-controls="appearance-settings" data-settings-tab="appearance">外观与显示</button><button id="server-settings-tab" role="tab" aria-selected="false" aria-controls="server-settings" data-settings-tab="server" hidden>内容服务器</button><button id="database-settings-tab" role="tab" aria-selected="false" aria-controls="database-settings" data-settings-tab="database" hidden>数据库</button></div>
+    <section id="appearance-settings" class="settings-section" role="tabpanel" aria-labelledby="appearance-settings-tab">
+      <div class="setting-row"><b>皮肤</b><label class="theme-control"><select id="theme-select" aria-label="选择皮肤"><option value="light">晨光 · 浅色</option><option value="paper">书页 · 暖色</option><option value="night">夜航 · 深色</option></select></label></div>
+      <h3>显示选项</h3>
+      <label class="setting-row"><b>事件列表</b><input id="display-explorer" type="checkbox" checked></label>
+      <label class="setting-row"><b>详情面板</b><input id="display-detail" type="checkbox" checked></label>
+      <label class="setting-row"><b>时间轴</b><input id="display-timeline" type="checkbox" checked></label>
+      <p id="preferences-status" class="settings-note" role="status"></p>
+    </section>
+    <section id="server-settings" class="settings-section" role="tabpanel" aria-labelledby="server-settings-tab" hidden>
+      <form id="server-form"><label class="setting-row"><b>开启内容服务器</b><input id="server-enabled" name="enabled" type="checkbox"></label><label class="setting-field" for="content-port">网页访问端口<input id="content-port" name="port" type="number" min="1024" max="65535" required value="8080"></label><div class="settings-actions"><button type="submit" class="accent-button">保存</button></div></form>
+      <div id="server-status" class="server-status" role="status"></div><div id="server-addresses" class="library-addresses" hidden></div>
+    </section>
+    <section id="database-settings" class="settings-section" role="tabpanel" aria-labelledby="database-settings-tab" hidden>
+      <div id="database-stats" class="library-stats"></div>
+      <div class="settings-actions"><button id="export-database" class="quiet-button">导出数据库</button><label class="import-label">导入数据库<input id="import-database" type="file" accept=".sqlite,.db,application/vnd.sqlite3,application/octet-stream" hidden></label></div>
+      <p id="database-status" class="settings-note" role="status"></p>
+    </section>
+  </dialog>
+  <dialog id="sources-dialog" class="modal"><div class="modal-heading"><div><span class="eyebrow">SOURCES & CONTEXT</span><h2>关于这部史书</h2></div><button data-close="sources-dialog" class="close-button" aria-label="关闭">×</button></div><div id="sources-content" class="reading"></div></dialog>
+  <div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

@@ -1,0 +1,391 @@
+{
+  "meta": {
+    "title": "明初，一座城与一个时代",
+    "version": "0.1.0",
+    "coverage": [
+      1368,
+      1421
+    ],
+    "description": "24条有出处的明初示例事件。范围仅代表篇章跨度，非逐年完整收录。",
+    "updatedAt": "2026-09-16"
+  },
+  "places": [
+    {
+      "id": "nanjing",
+      "name": "南京",
+      "historicalName": "应天府",
+      "lon": 118.7969,
+      "lat": 32.0603,
+      "aliases": [
+        "应天",
+        "金陵",
+        "京师"
+      ],
+      "description": "明初政治与文化活动的重要中心。"
+    },
+    {
+      "id": "beijing",
+      "name": "北京",
+      "historicalName": "北平／北京",
+      "lon": 116.4074,
+      "lat": 39.9042,
+      "aliases": [
+        "北平",
+        "大都",
+        "京师"
+      ],
+      "description": "本篇章中经历北平、北京等名称与地位变化。"
+    },
+    {
+      "id": "fengyang",
+      "name": "凤阳",
+      "historicalName": "临濠／中都",
+      "lon": 117.5623,
+      "lat": 32.866,
+      "aliases": [
+        "临濠",
+        "中都"
+      ],
+      "description": "明中都营建所在区域。"
+    },
+    {
+      "id": "xian",
+      "name": "西安",
+      "historicalName": "西安府",
+      "lon": 108.9398,
+      "lat": 34.3416,
+      "aliases": [
+        "长安"
+      ],
+      "description": "明初城垣扩建的重要地点。"
+    },
+    {
+      "id": "taicang",
+      "name": "太仓",
+      "historicalName": "刘家港所在区域",
+      "lon": 121.129,
+      "lat": 31.459,
+      "aliases": [
+        "刘家港",
+        "浏河"
+      ],
+      "description": "与郑和航海相关的港口区域，坐标为现代太仓市示意点。"
+    }
+  ],
+  "events": [
+    {
+      "id": "ming-001",
+      "title": "朱元璋在应天建立明朝",
+      "year": 1368,
+      "placeId": "nanjing",
+      "category": "建都",
+      "summary": "朱元璋在应天称帝，定国号为明，年号洪武。",
+      "sourceTitle": "故宫博物院 · 洪武皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226244.html",
+      "precision": "year",
+      "era": "明 · 洪武元年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-002",
+      "title": "朝廷组织编纂《元史》",
+      "year": 1369,
+      "placeId": "nanjing",
+      "category": "文化",
+      "summary": "明廷组织宋濂等人修撰前朝历史。地图标记朝廷所在地。",
+      "sourceTitle": "故宫博物院 · 洪武皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226244.html",
+      "precision": "year",
+      "era": "明 · 洪武二年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-003",
+      "title": "中都城开始营建",
+      "year": 1369,
+      "endYear": 1375,
+      "placeId": "fengyang",
+      "category": "营建",
+      "summary": "朱元璋选定家乡临濠营建中都。工程持续至1375年。",
+      "sourceTitle": "南京市文化和旅游局 · 凤阳明中都皇城城墙",
+      "sourceUrl": "https://wlj.nanjing.gov.cn/ztzl/mcq/syyj/202309/t20230906_4003763.html",
+      "precision": "year",
+      "era": "明 · 洪武二年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-004",
+      "title": "恢复科举取士",
+      "year": 1370,
+      "placeId": "nanjing",
+      "category": "制度",
+      "summary": "明廷恢复科举制度，以考试选拔官员。此处标记政策发布中心。",
+      "sourceTitle": "故宫博物院 · 洪武皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226244.html",
+      "precision": "year",
+      "era": "明 · 洪武三年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-005",
+      "title": "西安城墙大规模筑建",
+      "year": 1374,
+      "endYear": 1378,
+      "placeId": "xian",
+      "category": "营建",
+      "summary": "城墙初拓于1370年，1374年正式筑城，扩展旧有城垣。",
+      "sourceTitle": "中国邮政 · 西安城墙",
+      "sourceUrl": "https://cpi.chinapost.com.cn/html1/appreciationstamp/24101/6478-1.htm",
+      "precision": "year",
+      "era": "明 · 洪武七年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-006",
+      "title": "中都工程停止",
+      "year": 1375,
+      "placeId": "fengyang",
+      "category": "营建",
+      "summary": "营建六年后，中都工程因耗费等原因停止。",
+      "sourceTitle": "南京市文化和旅游局 · 凤阳明中都皇城城墙",
+      "sourceUrl": "https://wlj.nanjing.gov.cn/ztzl/mcq/syyj/202309/t20230906_4003763.html",
+      "precision": "year",
+      "era": "明 · 洪武八年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-007",
+      "title": "南京大内改建完成",
+      "year": 1377,
+      "placeId": "nanjing",
+      "category": "营建",
+      "summary": "洪武年间南京宫殿的改建工程在这一年完成。",
+      "sourceTitle": "故宫博物院 · 洪武皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226244.html",
+      "precision": "year",
+      "era": "明 · 洪武十年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-008",
+      "title": "西安城墙扩建竣工",
+      "year": 1378,
+      "placeId": "xian",
+      "category": "营建",
+      "summary": "明初扩建城墙工程完成。今天的城墙还经历了后世修缮。",
+      "sourceTitle": "中国邮政 · 西安城墙",
+      "sourceUrl": "https://cpi.chinapost.com.cn/html1/appreciationstamp/24101/6478-1.htm",
+      "precision": "year",
+      "era": "明 · 洪武十一年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-009",
+      "title": "废除中书省与丞相",
+      "year": 1380,
+      "placeId": "nanjing",
+      "category": "制度",
+      "summary": "中央政务体制改变，六部改为直接向皇帝负责。",
+      "sourceTitle": "故宫博物院 · 洪武皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226244.html",
+      "precision": "year",
+      "era": "明 · 洪武十三年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-010",
+      "title": "燕王朱棣赴北平",
+      "year": 1380,
+      "placeId": "beijing",
+      "category": "制度",
+      "summary": "朱棣前往北平就藩，北平成为其重要政治据点。",
+      "sourceTitle": "故宫博物院 · 永乐皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226257.html",
+      "precision": "year",
+      "era": "明 · 洪武十三年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-011",
+      "title": "建立黄册制度",
+      "year": 1381,
+      "placeId": "nanjing",
+      "category": "制度",
+      "summary": "朝廷推行户籍登记制度。地图标记政策中心，制度实施范围遍及各地。",
+      "sourceTitle": "故宫博物院 · 洪武皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226244.html",
+      "precision": "year",
+      "era": "明 · 洪武十四年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-012",
+      "title": "朱允炆即位",
+      "year": 1398,
+      "placeId": "nanjing",
+      "category": "制度",
+      "summary": "朱元璋去世后，朱允炆继位，次年使用建文年号。",
+      "sourceTitle": "故宫博物院 · 洪武皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226244.html",
+      "precision": "year",
+      "era": "明 · 洪武三十一年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-013",
+      "title": "靖难之役结束，朱棣即位",
+      "year": 1402,
+      "placeId": "nanjing",
+      "category": "战争",
+      "summary": "燕军进入南京，朱棣即位。年内纪年存在变更，次年改元永乐。",
+      "sourceTitle": "故宫博物院 · 永乐皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226257.html",
+      "precision": "year",
+      "era": "明 · 建文四年（年内纪年变更）",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-014",
+      "title": "北平改称北京",
+      "year": 1403,
+      "placeId": "beijing",
+      "category": "建都",
+      "summary": "明廷将北平改称北京。此时南京仍为朝廷首都。",
+      "sourceTitle": "故宫博物院 · 永乐皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226257.html",
+      "precision": "year",
+      "era": "明 · 永乐元年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-015",
+      "title": "大型类书编修启动",
+      "year": 1403,
+      "placeId": "nanjing",
+      "category": "文化",
+      "summary": "朱棣命文臣汇集古今典籍，开启后来《永乐大典》的编修工作。",
+      "sourceTitle": "国家图书馆 ·《永乐大典》史话",
+      "sourceUrl": "https://www.nlc.cn/migrated/www.nlc.cn/newhxjy/wjsy/wjls/wjqcsy/wjdsq/201011/P020101123502766205500.pdf",
+      "precision": "year",
+      "era": "明 · 永乐元年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-016",
+      "title": "《文献大成》编成",
+      "year": 1404,
+      "placeId": "nanjing",
+      "category": "文化",
+      "summary": "第一阶段成果编成《文献大成》，随后又被要求扩充重修。",
+      "sourceTitle": "国家图书馆 ·《永乐大典》史话",
+      "sourceUrl": "https://www.nlc.cn/migrated/www.nlc.cn/newhxjy/wjsy/wjls/wjqcsy/wjdsq/201011/P020101123502766205500.pdf",
+      "precision": "year",
+      "era": "明 · 永乐二年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-017",
+      "title": "郑和船队由刘家港扬帆",
+      "year": 1405,
+      "placeId": "taicang",
+      "category": "航海",
+      "summary": "郑和下西洋的船队以太仓刘家港为重要起锚港。此标记表示港口所在区域，不表示完整航线。",
+      "sourceTitle": "国家发展改革委 · 太仓刘家港历史",
+      "sourceUrl": "https://cjjjd.ndrc.gov.cn/gongzuodongtai/yanjiangyaowen/jiangsu/202006/t20200617_1231451.htm",
+      "precision": "year",
+      "era": "明 · 永乐三年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-018",
+      "title": "下诏筹建北京宫殿",
+      "year": 1406,
+      "placeId": "beijing",
+      "category": "营建",
+      "summary": "朝廷安排采木、烧砖等准备工作，启动北京宫殿营建计划。",
+      "sourceTitle": "故宫博物院 · 永乐营北京",
+      "sourceUrl": "https://www.dpm.org.cn/subject_600/buildingdetails/253788.html",
+      "precision": "year",
+      "era": "明 · 永乐四年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-019",
+      "title": "《永乐大典》定稿",
+      "year": 1407,
+      "placeId": "nanjing",
+      "category": "文化",
+      "summary": "大型类书完成定稿并获名《永乐大典》，进入誊抄阶段。",
+      "sourceTitle": "国家图书馆 ·《永乐大典》史话",
+      "sourceUrl": "https://www.nlc.cn/migrated/www.nlc.cn/newhxjy/wjsy/wjls/wjqcsy/wjdsq/201011/P020101123502766205500.pdf",
+      "precision": "year",
+      "era": "明 · 永乐五年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-020",
+      "title": "《永乐大典》誊抄完成",
+      "year": 1408,
+      "placeId": "nanjing",
+      "category": "文化",
+      "summary": "全书誊抄完成。1407年的定稿与1408年的抄成，是两个不同节点。",
+      "sourceTitle": "国家图书馆 ·《永乐大典》史话",
+      "sourceUrl": "https://www.nlc.cn/migrated/www.nlc.cn/newhxjy/wjsy/wjls/wjqcsy/wjdsq/201011/P020101123502766205500.pdf",
+      "precision": "year",
+      "era": "明 · 永乐六年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-021",
+      "title": "天寿山选定陵址",
+      "year": 1409,
+      "placeId": "beijing",
+      "category": "营建",
+      "summary": "朱棣在昌平选定陵址，将其山命名为天寿山。此处采用北京区域示意点。",
+      "sourceTitle": "故宫博物院 · 永乐皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226257.html",
+      "precision": "year",
+      "era": "明 · 永乐七年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-022",
+      "title": "长陵建成并安葬徐皇后",
+      "year": 1413,
+      "placeId": "beijing",
+      "category": "营建",
+      "summary": "天寿山陵寝建成，命名长陵，徐皇后在此安葬。",
+      "sourceTitle": "故宫博物院 · 永乐皇帝",
+      "sourceUrl": "https://www.dpm.org.cn/court/lineage/226257.html",
+      "precision": "year",
+      "era": "明 · 永乐十一年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-023",
+      "title": "北京紫禁城建成",
+      "year": 1420,
+      "placeId": "beijing",
+      "category": "营建",
+      "summary": "永乐十八年，朝廷宣布北京宫殿竣工。",
+      "sourceTitle": "故宫博物院 · 紫禁城建成",
+      "sourceUrl": "https://www.dpm.org.cn/subject_600/buildingdetails/253789.html",
+      "precision": "year",
+      "era": "明 · 永乐十八年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    },
+    {
+      "id": "ming-024",
+      "title": "明朝正式迁都北京",
+      "year": 1421,
+      "placeId": "beijing",
+      "category": "建都",
+      "summary": "朱棣正式迁都北京，开始使用新建的紫禁城。",
+      "sourceTitle": "故宫青少版 · 明成祖",
+      "sourceUrl": "https://young.dpm.org.cn/info/273",
+      "precision": "year",
+      "era": "明 · 永乐十九年",
+      "locationNote": "坐标为现代城市级示意点；不代表事件遗址或当年行政边界的精确位置。"
+    }
+  ]
+}

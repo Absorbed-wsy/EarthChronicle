@@ -1,0 +1,20 @@
+{
+  "name": "earth-chronicle",
+  "version": "0.3.3",
+  "private": true,
+  "description": "A Windows desktop globe and history reader with an optional read-only content server",
+  "type": "module",
+  "license": "GPL-3.0-only",
+  "engines": { "node": ">=24.19.0" },
+  "scripts": {
+    "start": "EarthChronicle.exe",
+    "start:server": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "prepare:desktop": "powershell -NoProfile -File desktop/prepare.ps1",
+    "build:desktop": "powershell -NoProfile -File desktop/build.ps1",
+    "test:native": "powershell -NoProfile -File desktop/test.ps1"
+  },
+  "dependencies": {
+    "cesium": "1.145.0"
+  }
+}
