@@ -4,7 +4,7 @@ const PANEL_LIMITS = {
   explorer: { min: 240, max: 440, initial: 300, label: '事件列表' },
   detail: { min: 260, max: 480, initial: 324, label: '详情面板' },
 };
-const TIMELINE_LIMITS = { min: 116, max: 300, initial: 156 };
+const TIMELINE_LIMITS = { min: 88, max: 300, initial: 88 };
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
 function normalizePreferences(saved) {
@@ -16,9 +16,16 @@ function normalizePreferences(saved) {
       ? clamp(width, limits.min, limits.max) : limits.initial;
     preferences[`${name}Collapsed`] = saved[`${name}Collapsed`] === true;
   }
-  preferences.timelineHeight = Number.isFinite(saved.timelineHeight)
+  const previousDefault = ((saved.layoutVersion === undefined || saved.layoutVersion === 3) && saved.timelineHeight === 96)
+    || ((saved.layoutVersion === undefined || saved.layoutVersion === 2) && saved.timelineHeight === 124)
+    || ((saved.layoutVersion === undefined || saved.layoutVersion === 1) && saved.timelineHeight === 156);
+  preferences.timelineHeight = Number.isFinite(saved.timelineHeight) && !previousDefault
     ? Math.round(clamp(saved.timelineHeight, TIMELINE_LIMITS.min, TIMELINE_LIMITS.max)) : TIMELINE_LIMITS.initial;
+  preferences.layoutVersion = 4;
   preferences.timelineCollapsed = saved.timelineCollapsed === true;
+  preferences.mapSource = saved.mapSource === 'offline' ? 'offline' : 'roads';
+  preferences.mapTerrain = saved.mapTerrain !== false;
+  preferences.mapQuality = ['auto', 'high', 'smooth'].includes(saved.mapQuality) ? saved.mapQuality : 'auto';
   return preferences;
 }
 
@@ -35,6 +42,7 @@ export function initPreferences({
   persistLocally = true,
   onThemeChange = () => {},
   onLayoutChange = () => {},
+  onMapChange = () => {},
 } = {}) {
   const preferences = normalizePreferences(initialPreferences ?? (persistLocally ? readLegacyPreferences() : {}));
   const workspace = document.querySelector('.workspace');
@@ -124,6 +132,13 @@ export function initPreferences({
   function applyLayout() {
     if (!workspace) return;
     if (themeSelect) themeSelect.disabled = locked;
+    for (const [id, key] of [['map-source', 'mapSource'], ['map-quality', 'mapQuality'], ['map-terrain', 'mapTerrain']]) {
+      const control = document.getElementById(id);
+      if (!control) continue;
+      if (id === 'map-terrain') control.checked = preferences[key];
+      else control.value = preferences[key];
+      control.disabled = locked || (id === 'map-terrain' && preferences.mapSource === 'offline');
+    }
     for (const [name, panel] of Object.entries(panels)) {
       const collapsed = preferences[`${name}Collapsed`];
       workspace.classList.toggle(`${name}-collapsed`, collapsed);
@@ -304,6 +319,14 @@ export function initPreferences({
   }
 
   listen(themeSelect, 'change', () => setTheme(themeSelect.value));
+  for (const [id, key] of [['map-source', 'mapSource'], ['map-quality', 'mapQuality'], ['map-terrain', 'mapTerrain']]) {
+    const control = document.getElementById(id);
+    listen(control, 'change', () => {
+      if (locked) return;
+      preferences[key] = id === 'map-terrain' ? control.checked : control.value;
+      applyLayout(); save(); onMapChange(snapshot());
+    });
+  }
   listen(window, 'resize', () => {
     if (drag && !isResizable(drag.name)) endDrag();
     scheduleLayout();
@@ -334,6 +357,7 @@ export function initPreferences({
       setTheme(preferences.theme, false);
       applyLayout();
       save(notify);
+      onMapChange(snapshot());
       scheduleLayout();
     },
     destroy() {

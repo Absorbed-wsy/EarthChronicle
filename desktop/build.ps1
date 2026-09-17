@@ -8,7 +8,9 @@ foreach ($name in @('Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.W
 }
 $references = @('System.dll', 'System.Core.dll', 'System.Drawing.dll', 'System.Windows.Forms.dll', 'System.Net.Http.dll', 'System.Web.Extensions.dll', (Join-Path $root 'Microsoft.Web.WebView2.Core.dll'), (Join-Path $root 'Microsoft.Web.WebView2.WinForms.dll'))
 $outputName = if ($LocalTest) { 'EarthChronicle.Test.exe' } else { 'EarthChronicle.exe' }
-$arguments = @('/nologo', '/target:winexe', '/platform:x64', '/optimize+', ('/out:' + (Join-Path $root $outputName)), ('/win32manifest:' + (Join-Path $PSScriptRoot 'app.manifest')))
+$iconPath = Join-Path $PSScriptRoot 'assets\EarthChronicle.ico'
+if (-not (Test-Path -LiteralPath $iconPath)) { throw 'Missing desktop\assets\EarthChronicle.ico. Restore the application source assets before building.' }
+$arguments = @('/nologo', '/target:winexe', '/platform:x64', '/optimize+', ('/out:' + (Join-Path $root $outputName)), ('/win32manifest:' + (Join-Path $PSScriptRoot 'app.manifest')), ('/win32icon:' + $iconPath), ('/resource:' + $iconPath + ',EarthChronicle.Icon'))
 if ($LocalTest) { $arguments += '/define:LOCAL_TEST' }
 foreach ($reference in $references) { $arguments += '/reference:' + $reference }
 $arguments += Join-Path $PSScriptRoot 'EarthChronicle.cs'

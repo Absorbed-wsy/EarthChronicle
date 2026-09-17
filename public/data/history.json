@@ -21,7 +21,10 @@
         "金陵",
         "京师"
       ],
-      "description": "明初政治与文化活动的重要中心。"
+      "description": "明初政治与文化活动的重要中心。",
+      "countryCode": "CN",
+      "regionCode": "CN-32",
+      "regionName": "江苏省"
     },
     {
       "id": "beijing",
@@ -34,7 +37,10 @@
         "大都",
         "京师"
       ],
-      "description": "本篇章中经历北平、北京等名称与地位变化。"
+      "description": "本篇章中经历北平、北京等名称与地位变化。",
+      "countryCode": "CN",
+      "regionCode": "CN-11",
+      "regionName": "北京市"
     },
     {
       "id": "fengyang",
@@ -46,7 +52,10 @@
         "临濠",
         "中都"
       ],
-      "description": "明中都营建所在区域。"
+      "description": "明中都营建所在区域。",
+      "countryCode": "CN",
+      "regionCode": "CN-34",
+      "regionName": "安徽省"
     },
     {
       "id": "xian",
@@ -57,7 +66,10 @@
       "aliases": [
         "长安"
       ],
-      "description": "明初城垣扩建的重要地点。"
+      "description": "明初城垣扩建的重要地点。",
+      "countryCode": "CN",
+      "regionCode": "CN-61",
+      "regionName": "陕西省"
     },
     {
       "id": "taicang",
@@ -69,7 +81,10 @@
         "刘家港",
         "浏河"
       ],
-      "description": "与郑和航海相关的港口区域，坐标为现代太仓市示意点。"
+      "description": "与郑和航海相关的港口区域，坐标为现代太仓市示意点。",
+      "countryCode": "CN",
+      "regionCode": "CN-32",
+      "regionName": "江苏省"
     }
   ],
   "events": [

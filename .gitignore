@@ -2,7 +2,7 @@ node_modules/
 /data/
 /backups/
 /runtime/node.exe
-/public/vendor/cesium/
+/public/vendor/maplibre/
 /.build-cache/
 /dist/
 *.exe
@@ -15,4 +15,3 @@ node_modules/
 .env
 .env.*
 !.env.example
-docs/*验收记录.md

@@ -16,6 +16,11 @@ using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
+[assembly: System.Reflection.AssemblyTitle("地球史书")]
+[assembly: System.Reflection.AssemblyProduct("EarthChronicle")]
+[assembly: System.Reflection.AssemblyVersion("0.6.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.6.0.0")]
+
 namespace EarthChronicle {
  internal static class NativeTransport {
   internal static HttpClient CreateClient(string key) {
@@ -91,7 +96,7 @@ namespace EarthChronicle {
    http=NativeTransport.CreateClient(key);
    Text="地球史书";StartPosition=FormStartPosition.CenterScreen;MinimumSize=new Size(960,640);Size=new Size(1440,940);WindowState=FormWindowState.Maximized;BackColor=Color.FromArgb(246,248,250);
    restoreState=WindowState;
-   globeIcon=CreateGlobeIcon();Icon=globeIcon;
+   globeIcon=LoadApplicationIcon();Icon=globeIcon;
    startup=new Label { Text="正在打开地球史书…",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,Font=new Font("Microsoft YaHei UI",12) };Controls.Add(startup);
    var menu=new ContextMenuStrip();menu.Items.Add("打开地球史书",null,(s,e)=>RestoreWindow());menu.Items.Add(new ToolStripSeparator());menu.Items.Add("退出软件",null,async(s,e)=>await ExitApplication());
    tray=new NotifyIcon { Icon=globeIcon,Text="地球史书",ContextMenuStrip=menu,Visible=false };tray.DoubleClick+=(s,e)=>RestoreWindow();
@@ -123,24 +128,24 @@ namespace EarthChronicle {
    catch(SocketException) {if(listener!=null)listener.Stop();listener=new TcpListener(IPAddress.Loopback,0);listener.Start();return ((IPEndPoint)listener.LocalEndpoint).Port;}
    finally {if(listener!=null)listener.Stop();}
   }
-  private static Icon CreateGlobeIcon() {
-   using(var bitmap=new Bitmap(32,32))using(var g=Graphics.FromImage(bitmap)) {
-    g.SmoothingMode=System.Drawing.Drawing2D.SmoothingMode.AntiAlias;g.Clear(Color.Transparent);
-    using(var fill=new SolidBrush(Color.FromArgb(40,92,122)))g.FillEllipse(fill,1,1,30,30);
-    using(var pen=new Pen(Color.FromArgb(225,245,229),1.5f)){g.DrawEllipse(pen,3,3,26,26);g.DrawEllipse(pen,10,3,12,26);g.DrawEllipse(pen,3,10,26,12);g.DrawLine(pen,3,16,29,16);}
-    var handle=bitmap.GetHicon();try{using(var source=Icon.FromHandle(handle))return (Icon)source.Clone();}finally{DestroyIcon(handle);}
+  private static Icon LoadApplicationIcon() {
+   // The exact same multi-resolution asset supplies the EXE, window and tray.
+   // Clone before closing the resource stream so the icon owns its lifetime.
+   using(var stream=typeof(ChronicleWindow).Assembly.GetManifestResourceStream("EarthChronicle.Icon")) {
+    if(stream==null)throw new IOException("缺少软件图标资源，请重新构建地球史书。");
+    using(var source=new Icon(stream))return (Icon)source.Clone();
    }
   }
-  [System.Runtime.InteropServices.DllImport("user32.dll")] private static extern bool DestroyIcon(IntPtr handle);
   private async Task Initialize() {
    try {
     string node=Path.Combine(Program.Root,"runtime","node.exe"),server=Path.Combine(Program.Root,"server.mjs");
     if(!File.Exists(node)||!File.Exists(server))throw new IOException("缺少运行文件，请保留完整的软件文件夹。");
     var info=new ProcessStartInfo(node,"--no-warnings \""+server+"\" --port "+port+(localTest?" --content-local-only":"")) { WorkingDirectory=Program.Root,UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,RedirectStandardOutput=true,RedirectStandardError=true,StandardOutputEncoding=Encoding.UTF8,StandardErrorEncoding=Encoding.UTF8 };
     backend=new Process { StartInfo=info,EnableRaisingEvents=true };backend.Exited+=OnBackendExited;backend.OutputDataReceived+=(s,e)=>{if(e.Data!=null)Program.Log("server: "+e.Data);};backend.ErrorDataReceived+=(s,e)=>{if(e.Data!=null)Program.Log("server: "+e.Data);};
+    if(exiting)return;
     // Inherit the environment directly: .NET Framework's copied dictionary can
-    // reject a host environment containing both PATH and Path. These two private
-    // values exist only for child creation and never reach the WebView profile.
+    // reject a host environment containing both PATH and Path. Private values
+    // exist only for child creation and never reach the WebView profile.
     Environment.SetEnvironmentVariable("EARTH_CHRONICLE_DESKTOP_KEY",key);
     Environment.SetEnvironmentVariable("EARTH_CHRONICLE_PARENT_PID",Process.GetCurrentProcess().Id.ToString());
     try{backend.Start();}finally{Environment.SetEnvironmentVariable("EARTH_CHRONICLE_DESKTOP_KEY",null);Environment.SetEnvironmentVariable("EARTH_CHRONICLE_PARENT_PID",null);}
@@ -270,7 +275,7 @@ namespace EarthChronicle {
   private void WriteState(string state){
    try{
     int backendId=0;try{if(backend!=null)backendId=backend.Id;}catch(InvalidOperationException){}
-    File.WriteAllText(Path.Combine(Program.Root,"data","desktop-state.json"),Program.Json.Serialize(new {pid=Process.GetCurrentProcess().Id,backendPid=backendId,browserPid=browserPid,port=port,state=state,windowState=WindowState.ToString().ToLowerInvariant(),windowVisible=Visible,showInTaskbar=ShowInTaskbar,taskbarEligible=Visible&&ShowInTaskbar,trayVisible=tray.Visible,hiddenToTray=hiddenToTray,trayHideQueued=trayHideQueued,closeRequestCount=closeRequestCount,trayHideCount=trayHideCount,hostHandle=IsHandleCreated?lastHostHandle:0,webViewHandle=view!=null&&view.IsHandleCreated?lastWebViewHandle:0,hostHandleCreatedCount=hostHandleCreatedCount,hostHandleDestroyedCount=hostHandleDestroyedCount,webViewHandleCreatedCount=webViewHandleCreatedCount,webViewHandleDestroyedCount=webViewHandleDestroyedCount,ready=ready,backendLost=backendLost,restoreState=restoreState.ToString().ToLowerInvariant(),updatedAt=DateTime.UtcNow.ToString("o"),version="0.3.3"}),Encoding.UTF8);
+    File.WriteAllText(Path.Combine(Program.Root,"data","desktop-state.json"),Program.Json.Serialize(new {pid=Process.GetCurrentProcess().Id,backendPid=backendId,browserPid=browserPid,port=port,state=state,windowState=WindowState.ToString().ToLowerInvariant(),windowVisible=Visible,showInTaskbar=ShowInTaskbar,taskbarEligible=Visible&&ShowInTaskbar,trayVisible=tray.Visible,hiddenToTray=hiddenToTray,trayHideQueued=trayHideQueued,closeRequestCount=closeRequestCount,trayHideCount=trayHideCount,hostHandle=IsHandleCreated?lastHostHandle:0,webViewHandle=view!=null&&view.IsHandleCreated?lastWebViewHandle:0,hostHandleCreatedCount=hostHandleCreatedCount,hostHandleDestroyedCount=hostHandleDestroyedCount,webViewHandleCreatedCount=webViewHandleCreatedCount,webViewHandleDestroyedCount=webViewHandleDestroyedCount,ready=ready,backendLost=backendLost,restoreState=restoreState.ToString().ToLowerInvariant(),updatedAt=DateTime.UtcNow.ToString("o"),version="0.6.0"}),Encoding.UTF8);
    }catch{}
   }
   private async Task ExitApplication() {

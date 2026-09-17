@@ -1,6 +1,6 @@
 {
   "name": "earth-chronicle",
-  "version": "0.3.3",
+  "version": "0.6.0",
   "private": true,
   "description": "A Windows desktop globe and history reader with an optional read-only content server",
   "type": "module",
@@ -15,6 +15,6 @@
     "test:native": "powershell -NoProfile -File desktop/test.ps1"
   },
   "dependencies": {
-    "cesium": "1.145.0"
+    "maplibre-gl": "6.10.0"
   }
 }

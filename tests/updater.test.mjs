@@ -84,13 +84,12 @@ test('valid update backs up all replaced files, preserves personal data and repo
     database.exec("CREATE TABLE personal (note TEXT); INSERT INTO personal VALUES ('keep my event');"); database.close();
     await f.payload('server.mjs', 'replacement server'); await f.payload('public/new.js', 'new asset');
     await f.payload('public/data/history.json', '{"events":[]}');
-    await f.payload('public/data/geology/manifest.json', '{"snapshots":[]}'); await f.manifest();
+    await f.manifest();
     const result = await f.run(); assert.equal(result.code, 0, result.stdout + result.stderr);
     assert.match(result.stdout, /0\.9-test/);
     assert.equal(await readFile(path.join(f.target, 'server.mjs'), 'utf8'), 'replacement server');
     assert.equal(await readFile(path.join(f.target, 'public/new.js'), 'utf8'), 'new asset');
     assert.equal(await readFile(path.join(f.target, 'public/data/history.json'), 'utf8'), '{"events":[]}');
-    assert.equal(await readFile(path.join(f.target, 'public/data/geology/manifest.json'), 'utf8'), '{"snapshots":[]}');
     assert.equal(await readFile(path.join(f.target, 'data/personal.txt'), 'utf8'), 'keep personal records');
     const backups = await readdir(path.join(f.target, 'backups')); assert.equal(backups.length, 1);
     assert.equal(await readFile(path.join(f.target, 'backups', backups[0], 'server.mjs'), 'utf8'), 'original server');

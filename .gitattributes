@@ -12,4 +12,3 @@
 # Preserve upstream license text, including its whitespace.
 licenses/** -whitespace
 runtime/LICENSE.txt -whitespace
-public/data/geology/License.source.txt -whitespace

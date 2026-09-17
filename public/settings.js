@@ -7,7 +7,7 @@ export function initSettings({session,api,preferences,flushPreferences,onDatabas
   $('database-settings-tab').hidden = !local;
   $('preferences-status').textContent = '';
   function chooseTab(name) {
-    if (!local && name !== 'appearance') return;
+    if (!local && !['appearance','map'].includes(name)) return;
     activeTab = name;
     for (const tab of document.querySelectorAll('[data-settings-tab]')) {
       const selected = tab.dataset.settingsTab === name;
@@ -35,7 +35,7 @@ export function initSettings({session,api,preferences,flushPreferences,onDatabas
       renderContentServer(settings.contentServer);
       const counts=settings.database;
       $('database-stats').replaceChildren();
-      for (const [value,label] of [[counts.historyEvents,'内置历史 · 只读'],[counts.geologySnapshots,'地质切片 · 只读'],[counts.places,'地理地点'],[counts.personalEvents,'个人记录']]) {
+      for (const [value,label] of [[counts.historyEvents,'内置历史 · 只读'],[counts.places,'历史地点'],[counts.personalEvents,'个人记录']]) {
         const item=document.createElement('div');item.className='library-stat';
         const number=document.createElement('strong');number.textContent=value;
         const caption=document.createElement('span');caption.textContent=label;item.append(number,caption);$('database-stats').append(item);
@@ -77,7 +77,7 @@ export function initSettings({session,api,preferences,flushPreferences,onDatabas
     busy=true;event.target.disabled=true;$('export-database').disabled=true;preferences.setLocked(true);
     $('database-status').textContent='正在校验数据库并合并个人记录…';
     try{
-      if(file.size>128*1024*1024)throw new Error('数据库文件不能超过 128 MB。');
+      if(file.size>2*1024*1024*1024)throw new Error('数据库文件不能超过 2 GB。');
       await flushPreferences();
       const response=await fetch('/api/database/import',{method:'POST',headers:{'Content-Type':'application/octet-stream','X-Edit-Token':session.token},body:file});
       const result=await response.json();if(!response.ok)throw new Error(result.error);

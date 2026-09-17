@@ -1,158 +1,181 @@
 import {initPreferences,readLegacyPreferences} from './preferences.js';
 import {initSettings} from './settings.js';
-import {initMapNavigation} from './map-navigation.js';
-import {eraForYear,yearLabel,eventMatches,escapeHtml as h,safeSourceUrl} from './domain.js';
+import {initMapView} from './map-view.js';
+import * as maplibregl from './vendor/maplibre/maplibre-gl.mjs';
+import {CATEGORIES,eraForYear,yearLabel,eventMatches,eventIsActive,escapeHtml as h,safeSourceUrl} from './domain.js';
+import {periodsForCountry,periodBounds,periodsForYear,yearTickLabel} from './history-navigation.js';
+import {EVENT_PAGE_SIZE,eventYearGroups,timelineStops} from './history-index.js';
+import {countryOptions,countryName,placesInCountry} from './geography.js';
+import {initCountryPicker} from './country-picker.js';
+import {initEventEditor} from './event-editor.js';
 const $=id=>document.getElementById(id);
-const state={mode:'history',year:1405,scope:'nearby',city:'all',category:'all',query:'',selected:null,geoIndex:1,labels:true,events:[],places:[],session:{},geo:null,min:1368,max:1421};
-let viewer,markerSource,geoSource,playTimer,toastTimer,geoRequest=0,navigation,globeReady=false,preferences,settings,editingEventId=null,pendingPreferences=null,preferencesTimer,preferencesSaving;
-let geoAttachment=Promise.resolve();
-const geoCache=new Map();
+const currentYear=()=>new Date().getFullYear();
+const state={year:currentYear(),scope:'year',countryCode:'CN',region:'all',city:'all',period:'all',category:'all',query:'',page:0,selected:null,labels:true,events:[],places:[],countryFeatures:null,session:{},min:-769,max:currentYear()};
+let mapView,playTimer,toastTimer,preferences,settings,countryPicker,eventEditor,pendingPreferences=null,preferencesTimer,preferencesSaving;
 function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,4200);}
 async function api(url,options={}){const response=await fetch(url,{...options,headers:{'Content-Type':'application/json',...(state.session.token?{'X-Edit-Token':state.session.token}:{}),...options.headers}});const data=await response.json();if(!response.ok)throw new Error(data.error||'请求未完成，请重试。');return data;}
-const placeOf=event=>state.places.find(p=>p.id===event?.placeId);
-const filtered=()=>state.events.filter(e=>eventMatches(e,state,state.places)).sort((a,b)=>a.year-b.year||a.title.localeCompare(b.title));
-const eventRange=e=>e.endYear&&e.endYear!==e.year?`${yearLabel(e.year)}—${yearLabel(e.endYear)}`:yearLabel(e.year);
-function activeEra(e){return e.era||eraForYear(e.year);}
+let indexedPlaces,placesById;
+function placeIndex(){if(indexedPlaces!==state.places){indexedPlaces=state.places;placesById=new Map(state.places.map(place=>[place.id,place]));}return placesById;}
+const placeOf=event=>placeIndex().get(event?.placeId);
+const historySort=(a,b)=>b.year-a.year||a.title.localeCompare(b.title,'zh-CN')||a.id.localeCompare(b.id);
+const matchingEvents=(scope=state.scope)=>state.events.filter(e=>eventMatches(e,{...state,scope},placeIndex())).sort(historySort);
+const filtered=()=>matchingEvents();
+const countryPlaces=()=>placesInCountry(state.places,state.countryCode);
+const regionalPlaces=()=>countryPlaces().filter(p=>state.region==='all'||p.regionCode===state.region);
+const cityIdOf=place=>place?.isCustom?place.cityId||'':place?.id;
+function cityOptions(places){const cities=new Map();for(const place of places){const id=cityIdOf(place);if(id&&!cities.has(id))cities.set(id,{...place,id,name:place.isCustom?place.cityName:place.name});}return [...cities.values()];}
+const canEdit=()=>state.session.interface==='local'&&state.session.canEdit===true;
+const regionTitle=()=>state.city!=='all'?cityOptions(state.places).find(p=>p.id===state.city)?.name:state.region==='all'?(state.countryCode==='all'?'全球':countryName(state.countryCode)):countryPlaces().find(p=>p.regionCode===state.region)?.regionName;
+function updateBounds(){
+  if(!periodsForCountry(state.countryCode).some(p=>p.id===state.period))state.period='all';
+  [state.min,state.max]=periodBounds(state.period,currentYear(),state.countryCode);
+  if(state.period==='all')for(const e of state.events){if(state.countryCode==='all'||placeOf(e)?.countryCode===state.countryCode){state.min=Math.min(state.min,e.year);state.max=Math.max(state.max,e.endYear??e.year);}}
+}
+function yearGroups(){return eventYearGroups(matchingEvents('all'),state.min,state.max);}
+const eventRange=e=>e.endYear!=null&&e.endYear!==e.year?`${yearLabel(e.year)}—${yearLabel(e.endYear)}`:yearLabel(e.year);
+function yearEra(year,countryCode=state.countryCode){if(countryCode!=='CN')return '';const era=eraForYear(year);return era.includes(' · ')?era:periodsForYear(year,currentYear(),countryCode).map(p=>p.name).join(' / ')||era;}
+function activeEra(e){return e.era||yearEra(e.year,placeOf(e)?.countryCode??'');}
 function stopPlayback(){clearInterval(playTimer);playTimer=null;$('play').textContent='▶';$('play').setAttribute('aria-label','播放时间轴');}
+function syncYearInputs(){ $('year-era').value=state.year<=0?'bce':'ce';$('year-input').value=state.year<=0?1-state.year:state.year; }
 function syncControls(){
-  const history=state.mode==='history';
-  $('add-button').hidden=!history||!state.session.canEdit;
-  document.body.dataset.mode=state.mode;
-  $('history-tab').classList.toggle('active',state.mode==='history');$('history-tab').setAttribute('aria-pressed',state.mode==='history');
-  $('geology-tab').classList.toggle('active',state.mode==='geology');$('geology-tab').setAttribute('aria-pressed',state.mode==='geology');
-  $('history-controls').hidden=state.mode!=='history';$('year-input').hidden=state.mode!=='history';$('geology-year').hidden=state.mode==='history';$('ma-unit').hidden=state.mode==='history';
-  $('labels-toggle').hidden=state.mode!=='history';
-  if(state.mode==='history'){
-    $('chapter-kicker').textContent='CHAPTER 01';$('chapter-title').textContent='明初，一座城与一个时代';
-    $('coverage').textContent=`示例篇章 · ${state.min}—${state.max}`;$('list-label').textContent='时间中的足迹';
-    $('time-unit').textContent='公元 / CE';$('era-label').textContent=eraForYear(state.year);$('year-input').value=state.year;$('year-input').min=state.min;$('year-input').max=state.max;
-    $('time-slider').min=state.min;$('time-slider').max=state.max;$('time-slider').value=state.year;$('time-slider').setAttribute('aria-label','浏览年份');
-    $('jump-start').textContent='篇章起点';$('jump-end').textContent='篇章终点';$('previous-year').setAttribute('aria-label','前一年');$('next-year').setAttribute('aria-label','后一年');
-    $('time-ticks').innerHTML=Array.from({length:6},(_,i)=>`<span>${Math.round(state.min+(state.max-state.min)*i/5)}</span>`).join('');
-    $('city-filters').innerHTML=[{id:'all',name:'全部'},...state.places].map(p=>`<button class="city-filter ${state.city===p.id?'active':''}" data-city="${h(p.id)}">${h(p.name)}</button>`).join('');
-    const dots=[...new Set(state.events.map(e=>e.year))];$('event-dots').innerHTML=dots.map(y=>`<button class="time-dot ${y===state.year?'active':''}" style="left:${(y-state.min)/(state.max-state.min)*100}%" data-year="${y}" title="${y} 年" aria-label="跳转到 ${y} 年"></button>`).join('');
-  } else {
-    const snap=state.geo?.snapshots[state.geoIndex];
-    $('chapter-kicker').textContent='DEEP TIME';$('chapter-title').textContent='大陆，也在漫长地旅行';
-    $('coverage').textContent='模型范围 · 0—250 Ma';$('list-label').textContent='地质年代切片';
-    $('time-unit').textContent='距今 / 百万年';$('geology-year').textContent=snap?.ma??'—';$('era-label').textContent=snap?.label??'加载中';
-    $('time-slider').min=0;$('time-slider').max=(state.geo?.snapshots.length||4)-1;$('time-slider').value=state.geoIndex;$('time-slider').setAttribute('aria-label','地质年代切片');
-    $('jump-start').textContent='现代参考';$('jump-end').textContent='最早切片';$('previous-year').setAttribute('aria-label','较近的年代');$('next-year').setAttribute('aria-label','较早的年代');
-    $('time-ticks').innerHTML=(state.geo?.snapshots||[]).map(s=>`<span>${s.ma} Ma</span>`).join('');$('event-dots').innerHTML='';
-  }
-  const position=history?state.year:state.geoIndex,first=history?state.min:0,last=history?state.max:(state.geo?.snapshots.length||4)-1;
-  $('previous-year').disabled=position<=first;$('next-year').disabled=position>=last;
-  $('jump-start').disabled=position<=first;$('jump-end').disabled=position>=last;
+  $('add-button').hidden=!canEdit();
+    $('chapter-kicker').textContent='WORLD · HISTORY';$('chapter-title').textContent='世界历史';
+    $('coverage').textContent=`已收录 ${state.events.filter(e=>state.countryCode==='all'||placeOf(e)?.countryCode===state.countryCode).length} 条事件`;$('list-label').textContent=`${regionTitle()} · ${state.scope==='all'?'全部年份':state.scope==='nearby'?'前后五年':yearLabel(state.year)}`;
+    $('time-unit').textContent='年份';$('era-label').textContent=yearEra(state.year);syncYearInputs();$('year-input').min=1;$('year-input').max=9999;
+    $('time-slider').min=state.min;$('time-slider').max=state.max;$('time-slider').value=state.year;$('time-slider').setAttribute('aria-label','浏览年份');$('time-slider').setAttribute('aria-valuetext',yearLabel(state.year));
+    $('jump-start').textContent='起点';$('jump-end').textContent='终点';$('previous-year').setAttribute('aria-label','前一年');$('next-year').setAttribute('aria-label','后一年');
+    $('time-ticks').innerHTML=Array.from({length:5},(_,i)=>`<span>${yearTickLabel(Math.round(state.min+(state.max-state.min)*i/4))}</span>`).join('');
+    $('country-filter').innerHTML='<option value="all">全部</option>'+countryOptions(state.countryFeatures,state.places).map(c=>`<option value="${h(c.code)}">${h(c.name)}</option>`).join('');$('country-filter').value=state.countryCode;
+    countryPicker?.sync();
+    const regions=[...new Map(countryPlaces().filter(p=>p.regionCode).map(p=>[p.regionCode,state.countryCode==='all'?`${countryName(p.countryCode)} · ${p.regionName}`:p.regionName])).entries()].sort((a,b)=>a[1].localeCompare(b[1],'zh-CN'));
+    $('region-filter').innerHTML='<option value="all">全部</option>'+regions.map(([code,name])=>`<option value="${h(code)}">${h(name)}</option>`).join('');$('region-filter').value=state.region;$('region-filter').disabled=!regions.length;
+    const cities=cityOptions(regionalPlaces());$('city-filter').innerHTML='<option value="all">全部</option>'+cities.map(p=>`<option value="${h(p.id)}">${h(p.name)}${state.countryCode==='all'?' · '+h(countryName(p.countryCode)):''}</option>`).join('');$('city-filter').value=state.city;$('city-filter').disabled=!cities.length;
+    const periods=periodsForCountry(state.countryCode);$('period-filter').innerHTML=periods.map(p=>`<option value="${h(p.id)}">${h(p.name)}</option>`).join('');$('period-filter').value=state.period;$('period-filter').disabled=periods.length===1;
+    const groups=yearGroups();
+    $('year-filter').innerHTML='<option value="">年份</option>'+groups.map(g=>`<option value="${g.year}">${yearLabel(g.year)} · ${g.count} 条</option>`).join('');$('year-filter').value=groups.some(g=>g.year===state.year)?String(state.year):'';$('year-filter').disabled=!groups.length;
+    const currentRecorded=groups.some(g=>g.year===state.year);
+    const dots=timelineStops(groups,state.min,state.max,Math.max(20,Math.floor(($('event-dots').clientWidth||600)/14)))
+      .map(g=>currentRecorded&&state.year>=g.first&&state.year<=g.last?{...g,year:state.year}:g);
+    $('event-dots').innerHTML=dots.map(g=>{const label=`${g.first===g.last?yearLabel(g.year):yearTickLabel(g.first)+'—'+yearTickLabel(g.last)} · ${g.count} 条事件`;return `<button class="time-dot ${g.year===state.year?'active':''}" style="left:${(g.year-state.min)/Math.max(1,state.max-state.min)*100}%" data-year="${g.year}" title="${h(label)}" aria-label="跳转到 ${yearLabel(g.year)}，${h(label)}"></button>`;}).join('');
+    $('previous-node').disabled=!groups.some(g=>g.year<state.year);$('next-node').disabled=!groups.some(g=>g.year>state.year);
+    $('scope').value=state.scope;$('category').value=state.category;
+  $('previous-year').disabled=$('jump-start').disabled=state.year<=state.min;
+  $('next-year').disabled=$('jump-end').disabled=state.year>=state.max;
   for(const id of ['previous-year','next-year'])$(id).title=$(id).getAttribute('aria-label');
   syncMapControls();
 }
 function renderList(){
-  if(state.mode==='geology'){
-    $('event-count').textContent=`${state.geo?.snapshots.length||0} 个切片`;
-    $('event-list').innerHTML=state.geo?state.geo.snapshots.map((s,i)=>`<button class="event-card geo-card ${i===state.geoIndex?'active':''}" data-geo="${i}"><div class="event-meta"><time>${s.ma===0?'今天':s.ma+' Ma'}</time></div><h3>${h(s.label)}</h3><span class="event-place">${h(s.shortDescription||'查看这个年代的陆块位置')}</span></button>`).join(''):'<div class="empty-state">地质数据未能载入，请刷新后重试。</div>';return;
-  }
   const events=filtered();$('event-count').textContent=`${events.length} 条事件`;
-  if(!events.length){$('event-list').innerHTML='<div class="empty-state"><strong>暂无符合条件的事件</strong><button id="clear-filters">查看整个篇章 →</button></div>';return;}
-  $('event-list').innerHTML=events.map(e=>`<button class="event-card ${e.id===state.selected?'active':''}" data-event="${h(e.id)}"><div class="event-meta"><time>${e.year<=0?'前'+(1-e.year):e.year}</time><span>${h(e.category)}</span>${e.userCreated?'<span class="user-badge">我的记录</span>':''}</div><h3>${h(e.title)}</h3><div class="event-place"><span class="place-dot"></span>${h(placeOf(e)?.historicalName||placeOf(e)?.name)}<span>·</span>${h(activeEra(e).replace('明 · ',''))}</div></button>`).join('');
+  if(!events.length){$('event-list').innerHTML=`<div class="empty-state"><strong>暂无匹配记录</strong>${state.scope!=='all'?'<button id="browse-region">全部年份</button>':''}${state.query||state.category!=='all'?'<button id="clear-filters">重置检索</button>':''}</div>`;return;}
+  const pages=Math.ceil(events.length/EVENT_PAGE_SIZE);state.page=Math.max(0,Math.min(state.page,pages-1));const offset=state.page*EVENT_PAGE_SIZE;
+  $('event-list').innerHTML=events.slice(offset,offset+EVENT_PAGE_SIZE).map(e=>`<button class="event-card ${e.id===state.selected?'active':''}" data-event="${h(e.id)}"><div class="event-meta"><time>${yearTickLabel(e.year)}</time><span>${h(e.category)}</span>${e.userCreated?'<span class="user-badge">自定义</span>':''}</div><h3>${h(e.title)}</h3><div class="event-place"><span class="place-dot"></span>${h(placeOf(e)?.name)}${activeEra(e)?'<span>·</span>'+h(activeEra(e).replace('明 · ','')):''}</div></button>`).join('')+(pages>1?`<nav class="list-pagination" aria-label="事件列表分页"><button data-page="${state.page-1}" ${state.page===0?'disabled':''}>上一页</button><span>${state.page+1} / ${pages}</span><button data-page="${state.page+1}" ${state.page>=pages-1?'disabled':''}>下一页</button></nav>`:'');
 }
 function renderDetail(){
-  if(state.mode==='geology'){
-    const s=state.geo?.snapshots[state.geoIndex];if(!s)return;
-    $('detail').innerHTML=`<div class="geo-detail"><div class="detail-eyeline"><span class="eyebrow">EARTH IN MOTION</span><span class="category-tag">地质重建</span></div><div class="detail-year">${s.ma===0?'现代':s.ma+' Ma'}</div><div class="detail-era">${s.ma===0?'模型的现代参考状态':'距今约 '+(s.ma>=100?(s.ma/100)+' 亿':s.ma*100+' 万')+' 年'}</div><h2>${h(s.label)}</h2><p class="detail-summary">${h(s.summary)}</p><p id="geo-load-status" class="geo-status">正在载入…</p><div class="source-block"><span class="section-label">模型与来源</span><a class="source-link" href="${h(safeSourceUrl(state.geo.sourceUrl)||'https://gwsdoc.gplates.org/models/')}" target="_blank" rel="noopener noreferrer">${h(state.geo.modelLabel||state.geo.model)} ↗</a><p class="precision-note">${h(state.geo.description)}</p></div></div>`;return;
-  }
   const e=state.events.find(e=>e.id===state.selected);
-  if(!e){$('detail').innerHTML='<div class="detail-empty"><span class="eyebrow">A PLACE IN TIME</span><h2>每个地点，<br>都有一部历史。</h2><p>选择地球上的地点或左侧事件，开始阅读。</p></div>';return;}
+  if(!e){$('detail').innerHTML='<div class="detail-empty"><span class="eyebrow">EVENT DETAILS</span><h2>事件详情</h2><p>选择事件查看详情。</p></div>';return;}
   const p=placeOf(e),samePlace=state.events.filter(x=>x.placeId===e.placeId&&x.id!==e.id).sort((a,b)=>Math.abs(a.year-e.year)-Math.abs(b.year-e.year)).slice(0,3).sort((a,b)=>a.year-b.year);
   const sourceUrl=safeSourceUrl(e.sourceUrl);const seq=state.events.filter(x=>!x.userCreated).sort((a,b)=>a.year-b.year).findIndex(x=>x.id===e.id)+1;
-  $('detail').innerHTML=`<div class="detail-eyeline"><span class="detail-sequence">${e.userCreated?'MY RECORD':String(seq).padStart(2,'0')+' / CHRONICLE'}</span><span class="category-tag">${h(e.category)}</span></div><div class="detail-year">${e.year<=0?'前 '+(1-e.year):e.year}</div><div class="detail-era">${h(activeEra(e))}${e.endYear&&e.endYear!==e.year?' · 至 '+h(yearLabel(e.endYear)):''}</div><h2>${h(e.title)}</h2><p class="detail-summary">${h(e.summary)}</p><div class="place-panel"><div class="place-panel-top"><div><h3>${h(p?.name)} <span class="optional">${h(p?.historicalName||'')}</span></h3><p class="coordinate">${Math.abs(p?.lat||0).toFixed(2)}° ${p?.lat>=0?'N':'S'} &nbsp; ${Math.abs(p?.lon||0).toFixed(2)}° ${p?.lon>=0?'E':'W'}</p></div><button id="fly-place">定位 ↗</button></div><p>${h(p?.description||'')}</p></div><div class="source-block"><span class="section-label">资料来源</span>${sourceUrl?`<a class="source-link" href="${h(sourceUrl)}" target="_blank" rel="noopener noreferrer">${h(e.sourceTitle||'查看原始资料')} ↗</a>`:`<span class="source-link">${h(e.sourceTitle||'用户笔记，尚未提供来源')}</span>`}<p class="precision-note">按年展示${e.userCreated?' · 用户记录，未经过史料核验':' · 内置史料，只读'}<br>${h(e.locationNote||'坐标为现代城市的示意定位，并非事件发生地的精确遗址坐标。')}</p></div><div class="related-section"><span class="section-label">这个地方的前后篇章</span>${samePlace.length?samePlace.map(x=>`<button class="related-item" data-related="${h(x.id)}"><time>${x.year}</time><span>${h(x.title)}</span></button>`).join(''):'<p class="precision-note">还没有其他记录。</p>'}</div>${e.userCreated&&state.session.canEdit?'<div class="settings-actions"><button class="quiet-button" id="edit-event">编辑个人记录</button><button class="delete-button" id="delete-event">删除个人记录</button></div>':''}`;
+  $('detail').innerHTML=`<div class="detail-eyeline"><span class="detail-sequence">${e.userCreated?'自定义':String(seq).padStart(2,'0')+' / CHRONICLE'}</span><span class="category-tag">${h(e.category)}</span></div><div class="detail-year">${e.year<=0?'前 '+(1-e.year):e.year}</div><div class="detail-era">${h(activeEra(e))}${e.endYear!=null&&e.endYear!==e.year?' · 至 '+h(yearLabel(e.endYear)):''}</div><h2>${h(e.title)}</h2>${e.userCreated&&canEdit()?'<div class="event-actions"><button class="quiet-button" id="edit-event">编辑</button><button class="quiet-button delete-button" id="delete-event">删除</button></div>':''}<p class="detail-summary">${h(e.summary)}</p><div class="place-panel"><div class="place-panel-top"><div><h3>${h(p?.name)} <span class="optional">${h(p?.historicalName||'')}</span></h3><p class="coordinate">${Math.abs(p?.lat||0).toFixed(2)}° ${p?.lat>=0?'N':'S'} &nbsp; ${Math.abs(p?.lon||0).toFixed(2)}° ${p?.lon>=0?'E':'W'}</p></div><button id="fly-place">定位 ↗</button></div><p>${h(p?.description||'')}</p></div><div class="source-block"><span class="section-label">资料来源</span>${sourceUrl?`<a class="source-link" href="${h(sourceUrl)}" target="_blank" rel="noopener noreferrer">${h(e.sourceTitle||'原始资料')} ↗</a>`:`<span class="source-link">${h(e.sourceTitle||'未提供来源')}</span>`}<p class="precision-note">按年展示${e.userCreated?' · 用户记录，未经过史料核验':' · 内置史料，只读'}<br>${h(e.locationNote||(p?.isCustom?'用户标记位置。':'坐标为现代城市的示意定位，并非事件发生地的精确遗址坐标。'))}</p></div><div class="related-section"><span class="section-label">相关事件</span>${samePlace.length?samePlace.map(x=>`<button class="related-item" data-related="${h(x.id)}"><time>${yearTickLabel(x.year)}</time><span>${h(x.title)}</span></button>`).join(''):'<p class="precision-note">暂无相关记录。</p>'}</div>`;
 }
 function updateMarkers(){
-  if(!viewer||!markerSource)return;markerSource.show=state.mode==='history';if(state.mode!=='history')return;
-  markerSource.entities.removeAll();const C=window.Cesium,events=filtered();
-  for(const p of state.places){const matches=events.filter(e=>e.placeId===p.id);const selected=state.events.find(e=>e.id===state.selected)?.placeId===p.id;
-    markerSource.entities.add({id:'place:'+p.id,position:C.Cartesian3.fromDegrees(p.lon,p.lat,1200),point:{pixelSize:selected?12:matches.length?8:5,color:C.Color.fromCssColorString(selected?'#f2d7a5':matches.length?'#cba971':'#6c858c'),outlineColor:C.Color.fromCssColorString('#172b32'),outlineWidth:2,disableDepthTestDistance:0},label:{text:p.name+(matches.length?' · '+matches.length:''),font:'13px "Microsoft YaHei",sans-serif',fillColor:C.Color.fromCssColorString(selected?'#f4dab0':'#d4e4df'),outlineColor:C.Color.fromCssColorString('#101e28'),outlineWidth:4,style:C.LabelStyle.FILL_AND_OUTLINE,verticalOrigin:C.VerticalOrigin.CENTER,horizontalOrigin:C.HorizontalOrigin.LEFT,pixelOffset:new C.Cartesian2(13,0),show:state.labels,disableDepthTestDistance:0,distanceDisplayCondition:new C.DistanceDisplayCondition(0,35000000)}});
-  }viewer.scene.requestRender();
+  if(!mapView)return;
+  const events=matchingEvents('year'),counts={};for(const e of events)counts[e.placeId]=(counts[e.placeId]||0)+1;
+  mapView.setHistoryPlaces(state.places.filter(p=>counts[p.id]),{selectedPlaceId:events.find(e=>e.id===state.selected)?.placeId,counts,labels:state.labels});
 }
-function reconcileSelection(){const events=filtered();if(!events.some(e=>e.id===state.selected))state.selected=events.find(e=>e.year===state.year)?.id||events[0]?.id||null;}
-function renderHistory(){if(state.mode!=='history'){renderList();return;}reconcileSelection();syncControls();renderList();renderDetail();updateMarkers();}
+function reconcileSelection(){const events=filtered();if(!events.some(e=>e.id===state.selected&&eventIsActive(e,state.year)))state.selected=events.find(e=>eventIsActive(e,state.year))?.id||null;}
+function renderHistory(){reconcileSelection();syncControls();renderList();renderDetail();updateMarkers();}
 function setYear(value,{select=true,refresh=false}={}){
   const numeric=Number(value),year=Math.max(state.min,Math.min(state.max,Number.isFinite(numeric)?Math.round(numeric):state.min));
   // An unchanged year must preserve the selected event and existing map markers.
-  if(year===state.year&&!refresh){$('year-input').value=year;$('time-slider').value=year;return;}
-  state.year=year;if(select){const events=filtered();state.selected=events.find(e=>e.year===state.year)?.id||events[0]?.id||null;}renderHistory();
+  if(year===state.year&&!refresh){syncYearInputs();$('time-slider').value=year;return;}
+  state.year=year;state.page=0;if(select)state.selected=filtered().find(e=>eventIsActive(e,state.year))?.id||null;renderHistory();
 }
-function selectEvent(id,{fly=false}={}){const event=state.events.find(e=>e.id===id);if(!event)return;state.selected=id;state.year=event.year;if(state.city!=='all'&&state.city!==event.placeId)state.city='all';if(state.category!=='all'&&state.category!==event.category){state.category='all';$('category').value='all';}if(!eventMatches(event,state,state.places)){state.query='';$('search').value='';}renderHistory();if(fly)flyPlace(placeOf(event));}
-function flyPlace(place){if(!viewer||!place)return;viewer.camera.flyTo({destination:Cesium.Cartesian3.fromDegrees(place.lon,place.lat,1800000),duration:window.matchMedia('(prefers-reduced-motion: reduce)').matches?0:1.25});}
-function homeView(){if(!viewer)return;viewer.camera.cancelFlight();viewer.camera.flyTo({destination:navigation?.isFlat()?Cesium.Rectangle.fromDegrees(-180,-90,180,90):Cesium.Cartesian3.fromDegrees(state.mode==='geology'?25:111,state.mode==='geology'?16:29,16000000),orientation:{heading:0,pitch:-Cesium.Math.PI_OVER_TWO,roll:0},duration:matchMedia('(prefers-reduced-motion: reduce)').matches?0:1.2});}
+function selectEvent(id,{fly=false}={}){const event=state.events.find(e=>e.id===id);if(!event)return;stopPlayback();state.selected=id;state.year=event.year;const place=placeOf(event);if(state.countryCode!=='all'&&state.countryCode!==place?.countryCode){state.countryCode=place?.countryCode||'all';state.period='all';updateBounds();}if(state.region!=='all'&&state.region!==place?.regionCode)state.region='all';if(state.city!=='all'&&state.city!==cityIdOf(place))state.city='all';if(event.year<state.min||event.year>state.max){state.period='all';updateBounds();}if(state.category!=='all'&&state.category!==event.category&&!(state.category==='custom'&&event.userCreated))state.category='all';if(!eventMatches(event,state,placeIndex())){state.query='';$('search').value='';}state.page=Math.max(0,Math.floor(filtered().findIndex(e=>e.id===id)/EVENT_PAGE_SIZE));renderHistory();if(fly)flyPlace(place);}
+function flyPlace(place){if(place)mapView?.flyPlace(place,{zoom:11});}
+function focusCountry(){
+  if(!mapView)return;
+  if(state.countryCode==='all'){homeView();return;}
+  const country=countryOptions(state.countryFeatures,state.places).find(c=>c.code===state.countryCode);
+  if(Number.isFinite(country?.lon)&&Number.isFinite(country?.lat))mapView.flyPlace(country,{zoom:3.5});
+  else {const place=countryPlaces().find(p=>Number.isFinite(p.lon)&&Number.isFinite(p.lat));if(place)mapView.flyPlace(place,{zoom:4});}
+}
+function focusRegion(){
+  if(!mapView)return;
+  if(state.region==='all'){focusCountry();return;}
+  const places=regionalPlaces().filter(p=>Number.isFinite(p.lon)&&Number.isFinite(p.lat));
+  if(!places.length)return;
+  if(places.length===1){mapView.flyPlace(places[0],{zoom:6});return;}
+  mapView.fitBounds([[Math.min(...places.map(p=>p.lon)),Math.min(...places.map(p=>p.lat))],[Math.max(...places.map(p=>p.lon)),Math.max(...places.map(p=>p.lat))]],{padding:60,maxZoom:7,pitch:0,duration:matchMedia('(prefers-reduced-motion: reduce)').matches?0:800});
+}
+function homeView(){mapView?.home();}
 function syncMapControls(){
-  const flat=navigation?.isFlat()||false;
+  const flat=mapView?.isFlat()||false;
   $('home-view').title=flat?'返回地图全景':'返回地球全景';$('home-view').setAttribute('aria-label',$('home-view').title);
 }
 function applyMapTheme(){
   const css=getComputedStyle(document.documentElement),theme=document.documentElement.dataset.theme;
   document.querySelector('meta[name="theme-color"]').content=css.getPropertyValue('--bg').trim();
-  if(!viewer)return;
-  viewer.scene.backgroundColor=Cesium.Color.fromCssColorString(css.getPropertyValue('--stage-bg').trim()||'#e7eff1');
-  viewer.scene.globe.baseColor=Cesium.Color.fromCssColorString(theme==='night'?'#162c3a':theme==='paper'?'#b1c5bf':'#c4dce3');
-  const layer=viewer.imageryLayers.length?viewer.imageryLayers.get(0):null;if(layer){layer.brightness=theme==='night'?.85:1;layer.saturation=theme==='night'?.65:.85;}
-  viewer.scene.requestRender();
+  mapView?.setTheme(theme);
 }
 async function initGlobe(){
-  if(!window.Cesium)throw new Error('地球组件未能加载');const C=window.Cesium;C.Ion.defaultAccessToken='';
-  viewer=new C.Viewer('globe',{animation:false,timeline:false,baseLayerPicker:false,geocoder:false,homeButton:false,sceneModePicker:false,navigationHelpButton:false,fullscreenButton:false,infoBox:false,selectionIndicator:false,baseLayer:false,mapMode2D:C.MapMode2D.ROTATE,terrainProvider:new C.EllipsoidTerrainProvider(),skyBox:false,skyAtmosphere:new C.SkyAtmosphere(),shouldAnimate:false,requestRenderMode:true,maximumRenderTimeChange:Infinity,contextOptions:{webgl:{alpha:false}}});
-  viewer.scene.backgroundColor=C.Color.fromCssColorString('#0a1118');viewer.scene.globe.baseColor=C.Color.fromCssColorString('#162c3a');if(viewer.scene.sun)viewer.scene.sun.show=false;if(viewer.scene.moon)viewer.scene.moon.show=false;viewer.scene.globe.enableLighting=false;viewer.scene.globe.showGroundAtmosphere=true;viewer.scene.screenSpaceCameraController.minimumZoomDistance=18000;viewer.scene.screenSpaceCameraController.maximumZoomDistance=60000000;viewer.resolutionScale=Math.min(devicePixelRatio,1.5);viewer.scene.skyAtmosphere.brightnessShift=-0.2;
-  const imagery=await C.TileMapServiceImageryProvider.fromUrl('/vendor/cesium/Assets/Textures/NaturalEarthII');const layer=viewer.imageryLayers.addImageryProvider(imagery);layer.brightness=.85;layer.saturation=.65;
-  markerSource=new C.CustomDataSource('历史地点');markerSource.clustering.enabled=true;markerSource.clustering.pixelRange=42;markerSource.clustering.minimumClusterSize=2;
-  markerSource.clustering.clusterEvent.addEventListener((entities,cluster)=>{const id={id:'cluster:'+entities.map(e=>e.id.slice(6)).join(',')};cluster.billboard.show=false;cluster.point.show=true;cluster.point.pixelSize=12;cluster.point.color=C.Color.fromCssColorString('#dfbd84');cluster.point.outlineColor=C.Color.fromCssColorString('#182e36');cluster.point.outlineWidth=2;cluster.point.id=id;cluster.label.show=state.labels;cluster.label.text=entities.length+' 处地点';cluster.label.font='13px "Microsoft YaHei",sans-serif';cluster.label.fillColor=C.Color.fromCssColorString('#f2dbb3');cluster.label.outlineColor=C.Color.fromCssColorString('#182e36');cluster.label.outlineWidth=4;cluster.label.style=C.LabelStyle.FILL_AND_OUTLINE;cluster.label.pixelOffset=new C.Cartesian2(16,0);cluster.label.horizontalOrigin=C.HorizontalOrigin.LEFT;cluster.label.id=id;});
-  viewer.dataSources.add(markerSource);viewer.camera.setView({destination:C.Cartesian3.fromDegrees(111,29,16000000)});
-  viewer.screenSpaceEventHandler.setInputAction(click=>{const picked=viewer.scene.pick(click.position);const id=picked?.id?.id;if(typeof id!=='string'||state.mode!=='history')return;if(id.startsWith('cluster:')){const ids=id.slice(8).split(','),places=state.places.filter(p=>ids.includes(p.id));flyPlace({lon:places.reduce((n,p)=>n+p.lon,0)/places.length,lat:places.reduce((n,p)=>n+p.lat,0)/places.length});return;}if(!id.startsWith('place:'))return;const placeId=id.slice(6);state.city=placeId;let events=filtered();if(!events.length){state.scope='all';$('scope').value='all';events=filtered();}const e=events.sort((a,b)=>Math.abs(a.year-state.year)-Math.abs(b.year-state.year))[0];if(e)selectEvent(e.id);else renderHistory();},C.ScreenSpaceEventType.LEFT_CLICK);
-  viewer.scene.renderError.addEventListener(()=>{$('globe-error').hidden=false;});navigation=initMapNavigation(viewer,syncMapControls);syncMapControls();applyMapTheme();updateMarkers();globeReady=true;if(state.mode==='geology'){loadGeology();homeView();}
+  const response=await fetch('/maps/liberty.json');
+  if(!response.ok)throw new Error('基础地图样式未能加载');
+  mapView=initMapView({maplibregl,container:'globe',baseStyle:await response.json(),preferences:preferences.snapshot(),
+    onStatus:message=>{$('map-status').textContent=message;$('map-retry').hidden=!message;},onNotice:toast,
+    onProjectionChange:syncMapControls,
+    onPickPoint:point=>eventEditor?.pickPoint(point),
+    onRenderError:()=>{$('globe-error').hidden=false;},
+    onHistoryPlace:placeId=>{
+      stopPlayback();
+      const place=placeIndex().get(placeId);state.countryCode=place?.countryCode||'all';updateBounds();
+      state.city=cityIdOf(place)||'all';state.region=place?.regionCode||'all';state.scope='year';state.page=0;
+      state.selected=matchingEvents('year').find(e=>e.placeId===placeId)?.id||null;renderHistory();
+    },
+  });
+  syncMapControls();applyMapTheme();updateMarkers();
+  window.addEventListener('pagehide',()=>mapView?.destroy(),{once:true});
 }
-async function loadGeology(){
-  if(!state.geo||!viewer||!globeReady)return;const request=++geoRequest,s=state.geo.snapshots[state.geoIndex];if(!s)return;
-  viewer.imageryLayers.get(0).show=false;if(markerSource)markerSource.show=false;if(geoSource){viewer.dataSources.remove(geoSource,false);geoSource=null;}
-  try{
-    let loading=geoCache.get(s.ma);if(!loading){loading=(async()=>{const data=await fetch('/api/geology/'+s.ma).then(r=>{if(!r.ok)throw new Error('数据文件不可用');return r.json();});const source=await Cesium.GeoJsonDataSource.load(data,{fill:Cesium.Color.fromCssColorString('#6f9180'),stroke:Cesium.Color.fromCssColorString('#b3c4a3'),strokeWidth:1,clampToGround:false});for(const e of source.entities.values){if(e.polygon){e.polygon.height=0;e.polygon.outline=false;}if(e.polyline)e.polyline.width=1;}return source;})();geoCache.set(s.ma,loading);loading.catch(()=>{if(geoCache.get(s.ma)===loading)geoCache.delete(s.ma);});}
-    const source=await loading;
-    // Cesium adds data sources asynchronously. Serialize attachment so a stale
-    // slice cannot appear after a newer slice or the historical map is selected.
-    const attachment=geoAttachment.catch(()=>{}).then(async()=>{
-      if(request!==geoRequest||state.mode!=='geology')return;
-      await viewer.dataSources.add(source);
-      if(request!==geoRequest||state.mode!=='geology'){viewer.dataSources.remove(source,false);return;}
-      geoSource=source;viewer.scene.requestRender();if($('geo-load-status'))$('geo-load-status').hidden=true;
-    });
-    geoAttachment=attachment;await attachment;
-  }catch(error){if(request!==geoRequest)return;if($('geo-load-status')){$('geo-load-status').hidden=false;$('geo-load-status').textContent='图层加载失败，请重新选择年代重试。';}toast('地质图层加载失败：'+error.message);}
+function step(delta){setYear(state.year+delta);}
+async function loadCountryCatalog(){try{const response=await fetch('/maps/country-labels.geojson');if(response.ok)state.countryFeatures=await response.json();}catch{/* Available historical places still populate the country selector. */}}
+async function refreshLibrary({startToday=false}={}){
+  const library=await api('/api/library');
+  state.events=library.events;state.places=library.places;state.meta=library.meta;
+  updateBounds();
+  if(startToday){state.period='all';updateBounds();state.year=currentYear();state.selected=null;state.scope='year';}
+  else state.year=Math.max(state.min,Math.min(state.max,state.year??state.max));
+  if(state.region!=='all'&&!countryPlaces().some(p=>p.regionCode===state.region))state.region='all';
+  if(state.city!=='all'&&!cityOptions(regionalPlaces()).some(p=>p.id===state.city))state.city='all';
+  state.page=0;
+  reconcileSelection();
+  $('category').innerHTML='<option value="all">全部类型</option><option value="custom">自定义</option>'+CATEGORIES.map(c=>`<option>${h(c)}</option>`).join('');
 }
-async function setMode(mode){if(mode==='geology'&&!state.geo?.snapshots.length)return;stopPlayback();state.mode=mode;if(mode==='geology'){$('event-dialog').close();}else reconcileSelection();syncControls();renderList();renderDetail();homeView();if(mode==='history'){geoRequest++;if(geoSource&&viewer){viewer.dataSources.remove(geoSource,false);geoSource=null;}if(viewer?.imageryLayers.length)viewer.imageryLayers.get(0).show=true;updateMarkers();}else{await loadGeology();}}
-function setGeo(index){if(!state.geo?.snapshots.length)return;const numeric=Number(index);state.geoIndex=Math.max(0,Math.min(state.geo.snapshots.length-1,Number.isFinite(numeric)?Math.round(numeric):0));syncControls();renderList();renderDetail();loadGeology();}
-function step(delta){if(state.mode==='history')setYear(state.year+delta);else{const index=Math.max(0,Math.min((state.geo?.snapshots.length||4)-1,state.geoIndex+delta));if(index!==state.geoIndex)setGeo(index);}}
-async function refreshLibrary(){const library=await api('/api/library');state.events=library.events;state.places=library.places;state.meta=library.meta;state.min=Math.min(1368,...state.events.map(e=>e.year));state.max=Math.max(1421,...state.events.map(e=>e.endYear??e.year));state.year=Math.max(state.min,Math.min(state.max,state.year));if(state.city!=='all'&&!state.places.some(p=>p.id===state.city))state.city='all';reconcileSelection();$('event-place').innerHTML=state.places.map(p=>`<option value="${h(p.id)}">${h(p.name)} · ${h(p.historicalName||'')}</option>`).join('');}
-function showSources(){const sources=[...new Map(state.events.filter(e=>!e.userCreated&&safeSourceUrl(e.sourceUrl)).map(e=>[e.sourceUrl,{title:e.sourceTitle,url:e.sourceUrl}])).values()];$('sources-content').innerHTML=`<p>地球史书 v${h(state.session.version || '0.3')}</p><h3>历史篇章</h3><p>本版收录 ${state.events.filter(e=>!e.userCreated).length} 条明初示例事件，提供摘要与出处。年份之外的月日未在时间轴中展开；无事件的年份表示尚未收录。</p><p>城市坐标用于阅读导航，不能当作古代遗址的精确定位。历史视图使用现代低分辨率地表参考，不代表明代地形或疆域。</p><div class="source-list">${sources.map(s=>`<a href="${h(s.url)}" target="_blank" rel="noopener noreferrer">${h(s.title)} ↗</a>`).join('')}</div><h3>地球演化</h3><p>本地保存 MULLER2019 模型的四个陆块轮廓切片。重建轮廓不等于精确古海岸线，也不包含古山脉高度。本版没有演算完整的地形变化。</p><a href="https://gwsdoc.gplates.org/models/" target="_blank" rel="noopener noreferrer">GPlates 模型说明 ↗</a><h3>显示与数据</h3><p>地球显示使用 CesiumJS；现代底图采用其附带的 Natural Earth II。核心资料从运行程序的主机读取，查看外部来源网页时需要联网。</p><h3>借鉴</h3><p>借鉴 Ancient Earth 的年代探索和 Running Reality 的时空读史方式，界面与程序独立实现。</p>`;$('sources-dialog').showModal();}
+function showSources(){const sources=[...new Map(state.events.filter(e=>!e.userCreated&&safeSourceUrl(e.sourceUrl)).map(e=>[e.sourceUrl,{title:e.sourceTitle,url:e.sourceUrl}])).values()];$('sources-content').innerHTML=`<p>地球史书 v${h(state.session.version || '0.3')}</p><h3>历史资料</h3><p>本版收录 ${state.events.filter(e=>!e.userCreated).length} 条明初示例事件，提供摘要与出处。年份之外的月日未在时间轴中展开；无事件的年份表示尚未收录。</p><p>城市坐标用于阅读导航，不能当作古代遗址的精确定位。地图为现代道路与地形，不代表事件发生时的道路或疆域。</p><div class="source-list">${sources.map(s=>`<a href="${h(s.url)}" target="_blank" rel="noopener noreferrer">${h(s.title)} ↗</a>`).join('')}</div><h3>显示与数据</h3><p>地图使用 MapLibre、OpenFreeMap / OpenStreetMap 道路数据和 Mapzen 高程数据；附带 Natural Earth 全球基础地图。详细道路及地形按视野联网加载。中文译名和当地名称以数据源提供的内容为准。</p>`;$('sources-dialog').showModal();}
 function bind(){
-  $('history-tab').onclick=()=>setMode('history');$('geology-tab').onclick=()=>setMode('geology');
-  $('scope').onchange=e=>{state.scope=e.target.value;state.selected=filtered()[0]?.id||null;renderHistory();};$('category').onchange=e=>{state.category=e.target.value;state.selected=filtered()[0]?.id||null;renderHistory();};
-  $('search').oninput=e=>{state.query=e.target.value;if(state.query){state.scope='all';$('scope').value='all';}state.selected=filtered()[0]?.id||null;renderHistory();};
-  $('city-filters').onclick=e=>{const button=e.target.closest('[data-city]');if(!button)return;state.city=button.dataset.city;state.selected=filtered()[0]?.id||null;renderHistory();};
-  $('event-list').onclick=e=>{const event=e.target.closest('[data-event]'),geo=e.target.closest('[data-geo]');if(event)selectEvent(event.dataset.event,{fly:false});if(geo)setGeo(geo.dataset.geo);if(e.target.id==='clear-filters'){Object.assign(state,{scope:'all',city:'all',category:'all',query:''});$('scope').value='all';$('category').value='all';$('search').value='';state.selected=filtered()[0]?.id;renderHistory();}};
+  const changed=()=>{stopPlayback();state.page=0;renderHistory();};
+  $('scope').onchange=e=>{state.scope=e.target.value;changed();};$('category').onchange=e=>{state.category=e.target.value;changed();};
+  let searchTimer;$('search').oninput=e=>{state.query=e.target.value;if(state.query)state.scope='all';clearTimeout(searchTimer);searchTimer=setTimeout(changed,150);};
+  $('country-filter').onchange=e=>{state.countryCode=e.target.value;state.region='all';state.city='all';state.period='all';state.selected=null;updateBounds();state.year=Math.max(state.min,Math.min(state.max,state.year));changed();focusCountry();};
+  $('region-filter').onchange=e=>{state.region=e.target.value;state.city='all';state.scope='all';state.selected=null;changed();focusRegion();};
+  $('city-filter').onchange=e=>{state.city=e.target.value;state.scope='all';state.selected=null;changed();if(state.city!=='all')flyPlace(cityOptions(state.places).find(p=>p.id===state.city));};
+  $('year-filter').onchange=e=>{if(e.target.value==='')return;stopPlayback();state.scope='year';setYear(Number(e.target.value),{refresh:true});};
+  $('period-filter').onchange=e=>{stopPlayback();state.period=e.target.value;updateBounds();state.scope='all';setYear(Math.max(state.min,Math.min(state.max,state.year)),{refresh:true});};
+  $('event-list').onclick=e=>{const event=e.target.closest('[data-event]');if(event)selectEvent(event.dataset.event,{fly:true});const page=e.target.closest('[data-page]');if(page&&!page.disabled){state.page=Number(page.dataset.page);renderList();$('event-list').scrollTop=0;}if(e.target.id==='browse-region'){state.scope='all';changed();}if(e.target.id==='clear-filters'){state.category='all';state.query='';$('search').value='';changed();}};
   $('detail').onclick=async e=>{const related=e.target.closest('[data-related]');if(related)selectEvent(related.dataset.related,{fly:true});if(e.target.id==='fly-place')flyPlace(placeOf(state.events.find(x=>x.id===state.selected)));if(e.target.id==='edit-event')openEventForm(state.events.find(x=>x.id===state.selected));if(e.target.id==='delete-event'){if(!confirm('删除这条个人记录？'))return;try{await api('/api/events/'+encodeURIComponent(state.selected),{method:'DELETE'});await refreshLibrary();renderHistory();toast('个人记录已删除');}catch(error){toast(error.message);}}};
-  $('year-input').oninput=e=>{const year=Number(e.target.value);if(Number.isInteger(year)&&year>=state.min&&year<=state.max){stopPlayback();setYear(year);}};$('year-input').onchange=e=>{stopPlayback();setYear(e.target.value);};$('year-input').onkeydown=e=>{if(e.key==='Enter'){stopPlayback();setYear(e.target.value);}};$('time-slider').oninput=e=>{stopPlayback();state.mode==='history'?setYear(e.target.value):setGeo(e.target.value);};$('event-dots').onclick=e=>{const b=e.target.closest('[data-year]');if(b){stopPlayback();setYear(b.dataset.year);}};
-  $('previous-year').onclick=()=>{stopPlayback();step(-1);};$('next-year').onclick=()=>{stopPlayback();step(1);};$('jump-start').onclick=()=>{stopPlayback();state.mode==='history'?setYear(state.min):setGeo(0);};$('jump-end').onclick=()=>{stopPlayback();state.mode==='history'?setYear(state.max):setGeo(state.geo.snapshots.length-1);};
-  $('play').onclick=()=>{if(playTimer){stopPlayback();return;}if(state.mode==='history'&&state.year===state.max)setYear(state.min);if(state.mode==='geology'&&state.geoIndex===state.geo.snapshots.length-1)setGeo(0);$('play').textContent='Ⅱ';$('play').setAttribute('aria-label','暂停时间轴');playTimer=setInterval(()=>{if((state.mode==='history'&&state.year>=state.max)||(state.mode==='geology'&&state.geoIndex>=state.geo.snapshots.length-1)){stopPlayback();return;}step(1);},state.mode==='history'?1200:5000);};
-  $('home-view').onclick=homeView;$('zoom-in').onclick=()=>{viewer?.camera.zoomIn(viewer.camera.positionCartographic.height*.35);viewer?.scene.requestRender();};$('zoom-out').onclick=()=>{viewer?.camera.zoomOut(viewer.camera.positionCartographic.height*.5);viewer?.scene.requestRender();};$('labels-toggle').onclick=()=>{state.labels=!state.labels;$('labels-toggle').classList.toggle('active',state.labels);$('labels-toggle').setAttribute('aria-pressed',state.labels);updateMarkers();};$('retry-globe').onclick=()=>location.reload();
+  const enteredYear=()=>{const n=Number($('year-input').value);if(!Number.isInteger(n)||n<1||n>9999){syncYearInputs();return;}stopPlayback();const year=$('year-era').value==='bce'?1-n:n;if(year<state.min||year>state.max){state.period='all';updateBounds();}setYear(year);};
+  $('year-input').onchange=enteredYear;$('year-input').onkeydown=e=>{if(e.key==='Enter')enteredYear();};$('year-era').onchange=enteredYear;$('time-slider').oninput=e=>{stopPlayback();setYear(e.target.value);};$('event-dots').onclick=e=>{const b=e.target.closest('[data-year]');if(b){stopPlayback();setYear(b.dataset.year);}};
+  $('previous-year').onclick=()=>{stopPlayback();step(-1);};$('next-year').onclick=()=>{stopPlayback();step(1);};$('jump-start').onclick=()=>{stopPlayback();setYear(state.min);};$('jump-end').onclick=()=>{stopPlayback();setYear(state.max);};
+  $('previous-node').onclick=()=>{const target=yearGroups().find(g=>g.year<state.year);if(target){stopPlayback();setYear(target.year);}};
+  $('next-node').onclick=()=>{const target=yearGroups().filter(g=>g.year>state.year).at(-1);if(target){stopPlayback();setYear(target.year);}};
+  $('play').onclick=()=>{if(playTimer){stopPlayback();return;}if(state.year===state.min)setYear(state.max);$('play').textContent='Ⅱ';$('play').setAttribute('aria-label','暂停时间轴');playTimer=setInterval(()=>{if(state.year<=state.min){stopPlayback();return;}step(-1);},1200);};
+  $('home-view').onclick=homeView;$('zoom-in').onclick=()=>mapView?.zoomIn();$('zoom-out').onclick=()=>mapView?.zoomOut();$('map-retry').onclick=()=>mapView?.retry();$('labels-toggle').onclick=()=>{state.labels=!state.labels;$('labels-toggle').classList.toggle('active',state.labels);$('labels-toggle').setAttribute('aria-pressed',state.labels);mapView?.setLabels(state.labels);updateMarkers();};$('retry-globe').onclick=()=>location.reload();
   $('add-button').onclick=()=>openEventForm();
-  $('event-form').onsubmit=async e=>{e.preventDefault();const form=e.target,data=Object.fromEntries(new FormData(form));data.year=Number(data.year);data.endYear=data.endYear?Number(data.endYear):null;const button=form.querySelector('[type=submit]');button.disabled=true;try{const result=await api(editingEventId?'/api/events/'+encodeURIComponent(editingEventId):'/api/events',{method:editingEventId?'PUT':'POST',body:JSON.stringify(data)});await refreshLibrary();state.mode='history';state.scope='all';state.city='all';state.category='all';state.query='';$('scope').value='all';$('category').value='all';$('search').value='';await setMode('history');selectEvent(result.event.id);$('event-dialog').close();toast('事件已保存');}catch(error){$('form-error').textContent=error.message;}finally{button.disabled=false;}};
-  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>$(b.dataset.close).close());document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}}));
+  document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const dialog=$(b.dataset.close);if(dialog.dataset.busy!=='true')dialog.close();});document.querySelectorAll('dialog').forEach(d=>d.addEventListener('click',e=>{if(e.target===d&&d.dataset.busy!=='true'){const r=d.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)d.close();}}));
   $('sources-button').onclick=showSources;
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPlayback();});
 }
 function openEventForm(event=null){
-  if(state.mode!=='history'||!state.session.canEdit)return;stopPlayback();editingEventId=event?.id||null;
-  const form=$('event-form');form.reset();form.querySelector('h2').textContent=event?'编辑个人记录':'记录一个事件';
-  if(event){for(const name of ['title','year','endYear','placeId','category','summary','sourceTitle','sourceUrl'])if(form.elements[name])form.elements[name].value=event[name]??'';}
-  else form.elements.year.value=state.year;
-  $('form-error').textContent='';$('event-dialog').showModal();
+  if(!canEdit())return;
+  if(event)eventEditor?.edit(event);else eventEditor?.start();
 }
 function schedulePreferences(value){
   pendingPreferences=value;clearTimeout(preferencesTimer);
@@ -167,19 +190,21 @@ async function flushPreferences(){
 async function init(){
   bind();
   try{
-    const results=await Promise.allSettled([api('/api/session'),refreshLibrary(),api('/api/geology/manifest')]);
+    countryPicker=initCountryPicker($('country-filter'),{onOpen:stopPlayback});
+    const results=await Promise.allSettled([api('/api/session'),refreshLibrary({startToday:true}),loadCountryCatalog()]);
     if(results[0].status==='rejected')throw results[0].reason;state.session=results[0].value;
     if(results[1].status==='rejected')throw results[1].reason;
-    if(results[2].status==='fulfilled')state.geo=results[2].value;else{$('geology-tab').disabled=true;console.warn('地质数据不可用',results[2].reason);}
     const local=state.session.interface==='local'&&state.session.canEdit===true;document.body.dataset.interface=local?'local':'web';
     document.title=local?'地球史书 · 本地窗口':'地球史书 · 网页阅读';
     let initialPreferences=null;
     if(local){const saved=await api('/api/preferences');initialPreferences=saved.preferences;if(!Object.keys(initialPreferences).length){initialPreferences=readLegacyPreferences();await api('/api/preferences',{method:'PUT',body:JSON.stringify({preferences:initialPreferences})});}}
-    preferences=initPreferences({initialPreferences,persistLocally:!local,onPreferencesChange:local?schedulePreferences:()=>{},onThemeChange:applyMapTheme,onLayoutChange:()=>{if(viewer){viewer.resize();viewer.scene.requestRender();}}});
+    preferences=initPreferences({initialPreferences,persistLocally:!local,onPreferencesChange:value=>{if(local)schedulePreferences(value);},onThemeChange:applyMapTheme,onMapChange:value=>mapView?.applyPreferences(value),onLayoutChange:()=>mapView?.resize()});
     settings=initSettings({session:state.session,api,preferences,flushPreferences,onDatabaseImport:async()=>{await refreshLibrary();renderHistory();},toast});
-    $('add-button').disabled=!state.session.canEdit;
-    state.selected=filtered().find(e=>e.year===state.year)?.id||filtered()[0]?.id||state.events[0]?.id;
+    eventEditor=initEventEditor({context:()=>state,map:()=>mapView,api,toast,onStart:stopPlayback,onSaved:async event=>{
+      await refreshLibrary();state.scope='year';state.city='all';state.region='all';state.category='custom';state.query='';$('search').value='';selectEvent(event.id,{fly:true});
+    }});
+    $('add-button').disabled=!canEdit();
     renderHistory();document.body.dataset.ready='true';try{await initGlobe();}catch(error){console.error(error);$('globe-error').hidden=false;}
-  }catch(error){$('event-list').innerHTML='<div class="empty-state"><strong>暂时无法打开数据</strong>'+h(error.message)+'<button onclick="location.reload()">重新连接 →</button></div>';toast('请确认本地程序或内容服务器正在运行');}
+  }catch(error){$('event-list').innerHTML='<div class="empty-state"><strong>数据加载失败</strong>'+h(error.message)+'<button onclick="location.reload()">重试</button></div>';toast('请确认本地程序或内容服务器正在运行');}
 }
 init();

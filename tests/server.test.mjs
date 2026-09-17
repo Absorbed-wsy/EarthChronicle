@@ -8,15 +8,15 @@ import {mkdtemp,rm,readFile,writeFile,mkdir} from 'node:fs/promises';
 import {tmpdir,networkInterfaces} from 'node:os';
 import path from 'node:path';
 import {createChronicleServer} from '../server.mjs';
+import {SCHEMA_VERSION} from '../database.mjs';
 import {eraForYear,eventMatches,safeSourceUrl,escapeHtml,yearLabel} from '../public/domain.js';
 
 test('year mapping, interval filtering and source escaping',()=>{
   assert.equal(eraForYear(1368),'明 · 洪武元年');assert.equal(eraForYear(1398),'明 · 洪武三十一年');assert.equal(eraForYear(1399),'明 · 建文元年');assert.equal(eraForYear(1405),'明 · 永乐三年');assert.equal(yearLabel(0),'公元前 1 年');
   const event={year:1374,endYear:1378,placeId:'x',title:'工程',category:'营建',summary:''},query={year:1377,scope:'year',city:'all',category:'all',query:''};assert.ok(eventMatches(event,query,[]));assert.ok(!eventMatches(event,{...query,year:1379},[]));assert.ok(!eventMatches(event,{...query,city:'y'},[]));assert.equal(safeSourceUrl('javascript:alert(1)'),null);assert.equal(escapeHtml('<img>'),'&lt;img&gt;');
 });
-test('bundled historical and geological content has valid linked data',async()=>{
+test('bundled historical content has valid linked data',async()=>{
   const data=JSON.parse(await readFile(new URL('../public/data/history.json',import.meta.url),'utf8'));assert.equal(data.events.length,24);assert.equal(new Set(data.events.map(e=>e.id)).size,24);for(const event of data.events){assert.ok(data.places.some(p=>p.id===event.placeId));assert.ok(safeSourceUrl(event.sourceUrl));assert.ok(event.precision==='year');}
-  const manifest=JSON.parse(await readFile(new URL('../public/data/geology/manifest.json',import.meta.url),'utf8'));for(const snap of manifest.snapshots){const json=JSON.parse(await readFile(new URL('../public/data/geology/'+snap.file,import.meta.url),'utf8'));assert.equal(json.type,'FeatureCollection');assert.ok(json.features.length>100);}
 });
 const example={title:'个人测试记录',year:1405,placeId:'nanjing',category:'文化',summary:'自动验证',sourceTitle:'测试',sourceUrl:'https://example.com/'};
 async function host(databasePath,publicDir){const desktopKey=randomBytes(32).toString('hex'),app=await createChronicleServer({databasePath,publicDir,desktopKey,contentHost:'127.0.0.1'});const port=await app.listen(0),base='http://127.0.0.1:'+port,session=await fetch(base+'/api/session',{headers:{'X-Desktop-Key':desktopKey}}).then(r=>r.json());return {app,base,session,desktopKey,request:(route,method='GET',body,headers={})=>fetch(base+route,{method,headers:{'X-Desktop-Key':desktopKey,'X-Edit-Token':session.token,'Content-Type':'application/json',...headers},...(body===undefined?{}:{body:Buffer.isBuffer(body)?body:JSON.stringify(body)})})};}
@@ -36,16 +36,17 @@ test('legacy data migration, one database, immutable sources and personal editin
   assert.equal((await request('/api/events','POST',{...example,endYear:1})).status,400);
   const id=library.events.find(e=>!e.userCreated).id;assert.equal((await request('/api/events/'+id,'PUT',example)).status,403);assert.equal((await request('/api/events/'+id,'DELETE')).status,403);
   assert.equal((await request('/api/import','POST',{})).status,404);assert.equal((await request('/api/export')).status,404);
+  assert.equal((await request('/api/map/tiles/osm/0/0/0.png')).status,404);
   assert.equal((await request('/data/history.json')).status,403);assert.equal((await request('/%2e%2e%5cserver.mjs')).status,403);
   const edit=await request('/api/events/user-legacy','PUT',{...example,title:'修改后的记录'}).then(r=>r.json());assert.equal(edit.event.createdAt,now);assert.equal(edit.event.title,'修改后的记录');
   assert.equal((await request('/api/preferences','PUT',{preferences:{theme:'night',timelineHeight:240,timelineCollapsed:true}})).status,200);
   assert.equal((await request('/api/preferences','PUT',{preferences:{theme:'unknown'}})).status,400);
-  const manifest=await request('/api/geology/manifest').then(r=>r.json());assert.equal(manifest.snapshots.length,4);assert.equal((await request('/api/geology/66').then(r=>r.json())).type,'FeatureCollection');
+  for(const route of ['/api/geology/manifest','/api/geology/evolution','/api/geology/66','/api/geology/assets/former-asset'])assert.equal((await request(route)).status,404);
   await running.app.close();running=null;
   const emptyPublic=path.join(dir,'empty-public');await mkdir(emptyPublic);
-  // The runtime must work with all source JSON and GeoJSON absent after the first migration.
+  // The runtime must work with the history source JSON absent after the first migration.
   running=await host(file,emptyPublic);library=await running.request('/api/library').then(r=>r.json());assert.equal(library.events.find(e=>e.id==='user-legacy').title,'修改后的记录');
-  assert.equal((await running.request('/api/geology/200').then(r=>r.json())).type,'FeatureCollection');assert.equal((await running.request('/api/preferences').then(r=>r.json())).preferences.theme,'night');
+  assert.equal((await running.request('/api/preferences').then(r=>r.json())).preferences.theme,'night');
  }finally{await running?.app.close();await clean(dir);}
 });
 test('whole SQLite database export/import preserves personal changes and rejects tampered canonical content',async()=>{
@@ -55,7 +56,7 @@ test('whole SQLite database export/import preserves personal changes and rejects
   const first=(await source.request('/api/events','POST',example).then(r=>r.json())).event;
   await source.request('/api/preferences','PUT',{preferences:{theme:'paper',explorerWidth:340,timelineHeight:210,timelineCollapsed:true}});
   const exported=await source.request('/api/database/export');assert.equal(exported.status,200);const bytes=Buffer.from(await exported.arrayBuffer());assert.equal(bytes.subarray(0,16).toString('latin1'),'SQLite format 3\0');
-  const file=path.join(dir,'backup.sqlite');await writeFile(file,bytes);let backupDB=new DatabaseSync(file);assert.equal(backupDB.prepare("SELECT count(*) count FROM canonical_records WHERE kind='geology-snapshot'").get().count,4);backupDB.close();
+  const file=path.join(dir,'backup.sqlite');await writeFile(file,bytes);let backupDB=new DatabaseSync(file);assert.equal(backupDB.prepare('PRAGMA user_version').get().user_version,SCHEMA_VERSION);assert.equal(backupDB.prepare("SELECT count(*) count FROM sqlite_schema WHERE name='science_assets'").get().count,0);backupDB.close();
   target=await host(path.join(dir,'target.sqlite'));const retained=(await target.request('/api/events','POST',{...example,title:'目标机原有记录'}).then(r=>r.json())).event;
   const importDB=b=>target.request('/api/database/import','POST',b,{'Content-Type':'application/octet-stream'});
   const result=await importDB(bytes).then(r=>r.json());assert.equal(result.imported,1);assert.equal((await target.request('/api/library').then(r=>r.json())).events.filter(e=>e.userCreated).length,2);assert.equal((await target.request('/api/preferences').then(r=>r.json())).preferences.timelineHeight,210);
@@ -71,11 +72,11 @@ test('content server is optional, web is read-only even on localhost, port colli
  const dir=await mkdtemp(path.join(tmpdir(),'earthchronicle-test-'));let local,blocker;
  try{
   local=await host(path.join(dir,'local.sqlite'));assert.equal((await local.request('/api/settings').then(r=>r.json())).contentServer.enabled,false);
-  const ordinarySession=await fetch(local.base+'/api/session').then(r=>r.json());assert.equal(ordinarySession.interface,'web');assert.equal(ordinarySession.canEdit,false);assert.equal(ordinarySession.token,null);assert.equal(ordinarySession.version,'0.3.3');
-  assert.equal((await fetch(local.base+'/api/library')).status,403);assert.equal((await fetch(local.base+'/api/geology/manifest')).status,403);assert.equal((await fetch(local.base+'/api/geology/66')).status,403);
+  const ordinarySession=await fetch(local.base+'/api/session').then(r=>r.json());assert.equal(ordinarySession.interface,'web');assert.equal(ordinarySession.canEdit,false);assert.equal(ordinarySession.token,null);assert.equal(ordinarySession.version,'0.6.0');
+  assert.equal((await fetch(local.base+'/api/library')).status,403);assert.equal((await fetch(local.base+'/api/geology/manifest')).status,404);assert.equal((await fetch(local.base+'/api/geology/66')).status,404);
   for(const wrongKey of ['', 'bad', 'f'.repeat(64)]){const session=await fetch(local.base+'/api/session',{headers:{'X-Desktop-Key':wrongKey}}).then(r=>r.json());assert.equal(session.canEdit,false);assert.equal(session.token,null);}
-  for(const file of ['/','/app.js','/style.css']){const response=await fetch(local.base+file);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('x-earth-chronicle-version'),'0.3.3');await response.arrayBuffer();}
-  const health=await fetch(local.base+'/api/health').then(r=>r.json());assert.deepEqual(health,{appId:'earth-chronicle',version:'0.3.3'});
+  for(const file of ['/','/app.js','/style.css','/maps/liberty.json']){const response=await fetch(local.base+file);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('x-earth-chronicle-version'),'0.6.0');await response.arrayBuffer();}
+  const health=await fetch(local.base+'/api/health').then(r=>r.json());assert.deepEqual(health,{appId:'earth-chronicle',version:'0.6.0'});
   // Old browser tabs may retain the previous edit token. It must be useless
   // without the native application's key, even from this same computer.
   const adminRoutes=[['/api/settings','GET'],['/api/preferences','GET'],['/api/preferences','PUT','{}'],['/api/database/export','GET'],['/api/database/import','POST','x'],['/api/content-server','PUT','{}'],['/api/events','POST',JSON.stringify(example)],['/api/events/user-fake','PUT',JSON.stringify(example)],['/api/events/user-fake','DELETE'],['/api/shutdown','POST','{}']];
@@ -89,7 +90,7 @@ test('content server is optional, web is read-only even on localhost, port colli
   // exposed on the machine's LAN interfaces while this suite runs.
   assert.equal(await canConnect('127.0.0.1',freePort),true);
   for(const address of Object.values(networkInterfaces()).flat().filter(a=>a&&a.family==='IPv4'&&!a.internal))assert.equal(await canConnect(address.address,freePort),false,'content listener must not bind '+address.address);
-  assert.equal((await fetch(web+'/api/library')).status,200);assert.equal((await fetch(web+'/api/geology/120')).status,200);
+  assert.equal((await fetch(web+'/api/library')).status,200);assert.equal((await fetch(web+'/api/geology/120')).status,404);
   const redirected=await fetch(local.base+'/',{redirect:'manual'});assert.equal(redirected.status,303);assert.equal(redirected.headers.get('location'),web+'/');assert.equal((await fetch(local.base+'/api/library')).status,200);
   assert.equal((await fetch(web+'/api/session',{headers:{'X-Desktop-Key':local.desktopKey}}).then(r=>r.json())).canEdit,false);
   for(const [route,method,body]of adminRoutes){
@@ -161,6 +162,44 @@ test('invalid preferences return a client error without changing saved values',a
   for(const body of [null,{},[],{preferences:null},{preferences:{theme:'invalid'}}])assert.equal((await local.request('/api/preferences','PUT',body)).status,400);
   assert.equal((await local.request('/api/preferences').then(r=>r.json())).preferences.theme,'paper');
  }finally{await local?.app.close();await clean(dir);}
+});
+
+test('oversized chunked JSON returns a useful limit error and leaves the server usable',async()=>{
+ const dir=await mkdtemp(path.join(tmpdir(),'earthchronicle-test-'));let local;
+ try{
+  local=await host(path.join(dir,'local.sqlite'));
+  const response=await new Promise((resolve,reject)=>{
+   const request=http.request(local.base+'/api/events',{method:'POST',headers:{'X-Desktop-Key':local.desktopKey,'X-Edit-Token':local.session.token,'Content-Type':'application/json','Transfer-Encoding':'chunked'}},response=>{
+    const chunks=[];response.on('data',chunk=>chunks.push(chunk));response.on('error',reject);response.on('end',()=>{request.destroy();resolve({status:response.statusCode,body:JSON.parse(Buffer.concat(chunks))});});
+   });
+   request.on('error',reject);request.setTimeout(5000,()=>request.destroy(new Error('request timed out')));
+   for(let index=0;index<17;index++)request.write(Buffer.alloc(64*1024,'x'));
+   request.end();
+  });
+  assert.equal(response.status,413);assert.match(response.body.error,/大小/);
+  assert.equal((await local.request('/api/library').then(response=>response.json())).events.filter(event=>event.userCreated).length,0);
+  assert.equal((await local.request('/api/events','POST',example)).status,201);
+ }finally{await local?.app.close();await clean(dir);}
+});
+
+test('turning off the content server closes paused downloads without blocking local settings',async()=>{
+ const dir=await mkdtemp(path.join(tmpdir(),'earthchronicle-test-'));let local,download,deadline;
+ try{
+  const publicDir=path.join(dir,'public');await mkdir(path.join(publicDir,'data'),{recursive:true});
+  await writeFile(path.join(publicDir,'data','history.json'),await readFile(new URL('../public/data/history.json',import.meta.url)));
+  await writeFile(path.join(publicDir,'download.bin'),Buffer.alloc(16*1024*1024));
+  local=await host(path.join(dir,'local.sqlite'),publicDir);
+  const allocator=http.createServer();await new Promise(resolve=>allocator.listen(0,'127.0.0.1',resolve));const port=allocator.address().port;await new Promise(resolve=>allocator.close(resolve));
+  assert.equal((await local.request('/api/content-server','PUT',{enabled:true,port})).status,200);
+  await new Promise((resolve,reject)=>{download=http.get(`http://127.0.0.1:${port}/download.bin`,response=>{response.pause();resolve();});download.on('error',reject);});
+  const response=await Promise.race([
+   local.request('/api/content-server','PUT',{enabled:false,port}),
+   new Promise((resolve,reject)=>{deadline=setTimeout(()=>reject(new Error('paused reader blocked the content-server setting')),1500);}),
+  ]);
+  clearTimeout(deadline);assert.equal(response.status,200);assert.equal((await response.json()).contentServer.enabled,false);
+  assert.equal(await canConnect('127.0.0.1',port),false);
+  assert.equal((await local.request('/api/library')).status,200);
+ }finally{clearTimeout(deadline);download?.destroy();await local?.app.close();await clean(dir);}
 });
 
 test('invalid database imports are atomic and valid imports never enable network sharing',async()=>{
