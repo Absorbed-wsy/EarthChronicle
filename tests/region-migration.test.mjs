@@ -128,8 +128,8 @@ test('region migration checks the original checksum before changing stored place
 test('event categories match the shared catalogue and layout migration metadata is constrained', () => {
   for (const category of CATEGORIES) assert.equal(validateEvent({ ...personal, category }, new Set(['nanjing'])).category, category);
   assert.throws(() => validateEvent({ ...personal, category: '无效类别' }, new Set(['nanjing'])), /有效的事件类型/);
-  for (const layoutVersion of [1, 2, 3, 4]) assert.deepEqual(validatePreferences({ layoutVersion, timelineHeight: 96 }), { layoutVersion, timelineHeight: 96 });
+  for (const layoutVersion of [1, 2, 3, 4, 5]) assert.deepEqual(validatePreferences({ layoutVersion, timelineHeight: 96 }), { layoutVersion, timelineHeight: 96 });
   for (const timelineHeight of [88, 124, 156, 300]) assert.deepEqual(validatePreferences({ timelineHeight }), { timelineHeight });
   for (const timelineHeight of [87, 301]) assert.throws(() => validatePreferences({ timelineHeight }), /显示设置.*无效/);
-  for (const layoutVersion of [0, 5, 1.5, '2', null]) assert.throws(() => validatePreferences({ layoutVersion }), /显示设置.*无效/);
+  for (const layoutVersion of [0, 6, 1.5, '2', null]) assert.throws(() => validatePreferences({ layoutVersion }), /显示设置.*无效/);
 });

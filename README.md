@@ -8,6 +8,14 @@
 
 软件附带全球基础地图，详细道路与地点按视野从 OpenFreeMap 加载矢量数据，真实地形使用 Mapzen Terrain Tiles。在线细节需要联网，无需服务密钥，也无需下载地区地图包。城市和地区在数据提供中文名称时显示中文与当地名称对照，点击城市名称可自动放大。地图以分级加载和有限缓存控制资源使用，数据来源和精度限制见使用说明。
 
+## 下载运行
+
+在 [v0.1 Release](https://github.com/Absorbed-wsy/EarthChronicle/releases/tag/v0.1) 下载 `EarthChronicle-v0.1-windows-x64.zip`，解压到可写目录，双击其中的 **EarthChronicle.exe**。发行包已包含 Node.js、地图、字形及程序组件，无需构建或安装 Node.js；请保留完整文件夹。
+
+支持 Windows 10/11 x64，需要 .NET Framework 4.8 与 [Microsoft WebView2 Evergreen Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)。缺少 WebView2 时安装官方运行时后重试。不要直接在压缩包中启动。首次运行自动建立数据库并导入内置资料，内容服务器默认关闭。
+
+更新已有软件前，请通过托盘菜单退出，并备份 `data` 文件夹或导出数据库。解压新版后保留原 `data` 文件夹即可继续使用个人记录。Release 同时提供 `SHA256SUMS.txt` 用于校验下载文件。
+
 ## 从源码构建
 
 环境要求：Windows 10/11 x64、.NET Framework 4.8、WebView2 Evergreen Runtime，以及 PowerShell、curl、tar。WebView2 Runtime 可从 [Microsoft 官方页面](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)获取。
@@ -21,7 +29,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
 
 准备脚本下载并校验 Node.js 24.19.0、MapLibre GL JS 6.10.0 和 WebView2 SDK 1.0.4191.47，无需全局安装 Node.js 或包管理器。首次准备需要网络；可通过 `desktop/prepare.ps1 -CachePath <缓存目录>` 复用已下载的依赖。SDK 不包含 WebView2 Evergreen Runtime，请提前安装上述系统运行环境。
 
-构建产物为项目根目录的 **EarthChronicle.exe**，双击即可运行。使用时保留同目录的组件、`runtime` 和 `public` 资源；仅复制 EXE 无法运行完整软件。构建脚本不生成安装包。
+构建产物为项目根目录的 **EarthChronicle.exe**，双击即可运行。使用时保留同目录的组件、`runtime` 和 `public` 资源；仅复制 EXE 无法运行完整软件。
+
+制作完整便携发行包：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File desktop/package.ps1
+```
+
+打包脚本重新编译 EXE，校验必要资源并生成 `dist/EarthChronicle-v0.1-windows-x64.zip` 和校验文件。包中不包含个人数据库、日志、浏览器缓存或开发工具。已完成构建时可用 `-SkipBuild`。
 
 窗口、地图、个人记录、网页访问及数据库备份的操作方法见 [使用说明](docs/使用说明.md)。
 
@@ -34,12 +50,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
 | `public/data/history.json` | 5 个地点、24 条中国明初历史事件及来源 |
 | `public/maps/*.geojson` | 全球基础陆地、国家边界、国家名称及 1,251 个主要城市 |
 | `public/maps/liberty.json`、`sprite*` | 地图样式及普通、高清图标图集 |
+| `public/maps/fonts/noto-sans/` | 地图预制字形，约 33 MiB，含 47,586 个字形及文件校验清单 |
 | `desktop/assets/`、`public/favicon.*` | 桌面程序与网页图标 |
 | `licenses/`、`runtime/LICENSE.txt` | 随附资料与组件的许可声明 |
 
 首次启动会自动创建 `data/chronicle.sqlite` 并导入基础历史资料。当前年份没有资料时，列表和地图事件标记为空，可选择“明”或有记录的年份浏览。其他国家的历史事件尚未收录，国家列表不代表资料覆盖范围。
 
-基础地图及样式共约 1.2 MiB，构建完成后可离线显示。字体使用系统字体。在线道路、街区和高程按视野从网络加载；这些详细数据不随仓库分发，也不需要预先下载。
+基础地图及样式共约 1.2 MiB，另附约 33 MiB 地图字形，构建完成后可离线显示。字形从本地读取，无需联网下载字体；本地字形文件读取失败时使用系统字体。在线道路、街区和高程按需从网络加载；这些详细数据不随仓库分发，也不需要预先下载。
 
 内置资料、个人事件、显示设置和内容服务器配置统一保存在该数据库中。内置资料只读，个人事件可在本地软件中编辑；网页端只读。本机数据库、备份、日志及浏览器缓存不提交到仓库。更新软件时保留原 `data` 文件夹，个人记录会保留。
 
@@ -54,7 +71,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File desktop/test.ps1
 ```
 
-自动测试覆盖数据库迁移、自定义事件、网页只读权限、筛选与时间轴、地图资源完整性及更新工具。GitHub Actions 在 Windows 上从源码执行依赖准备、自动测试和 EXE 编译。
+自动测试覆盖数据库迁移、自定义事件、网页只读权限、筛选与时间轴、地图资源完整性及更新工具。GitHub Actions 在 Windows 上从源码执行依赖准备、自动测试、EXE 编译及便携包打包。
 
 ## 工程目录
 

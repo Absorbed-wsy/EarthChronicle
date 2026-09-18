@@ -123,7 +123,7 @@ export function validateEvent(input, places, id = null, { persisted = false } = 
 
 export function validatePreferences(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new RequestError(400, '显示设置格式不正确。');
-  const ranges = { explorerWidth: [240, 440], detailWidth: [260, 480], timelineHeight: [88, 300], layoutVersion: [1, 4] };
+  const ranges = { explorerWidth: [240, 440], detailWidth: [260, 480], timelineHeight: [88, 300], layoutVersion: [1, 5] };
   const booleans = ['explorerCollapsed', 'detailCollapsed', 'timelineCollapsed', 'mapTerrain'];
   const result = {};
   for (const [key, value] of Object.entries(input)) {

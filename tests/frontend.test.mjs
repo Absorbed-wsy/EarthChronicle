@@ -27,8 +27,8 @@ class Element {
   querySelectorAll(){return [];}
   replaceChildren(){}
   append(){}
-  focus(){}
-  close(){this.open=false;}
+  focus(){this.focused=true;}
+  close(){if(!this.open)return;this.open=false;this.listeners.get('close')?.({target:this});}
   showModal(){this.open=true;}
 }
 function environment() {
@@ -68,6 +68,127 @@ const countryFeatures={type:'FeatureCollection',features:[
   {type:'Feature',properties:{country_code:'JP','name:zh':'日本'},geometry:{type:'Point',coordinates:[138,37]}},
 ]};
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
+
+function deletionApp() {
+  const env=app(),{get,context}=env,dialog=get('delete-event-dialog');
+  const cancel=get('cancel-delete-event'),confirm=get('confirm-delete-event'),close=get('close-delete-event');
+  for(const button of [cancel,close])button.dataset.close='delete-event-dialog';
+  dialog.querySelectorAll=()=>[cancel,confirm,close];
+  dialog.getBoundingClientRect=()=>({left:100,right:500,top:100,bottom:350});
+  context.document.querySelectorAll=selector=>selector==='dialog'?[dialog]:selector==='[data-close]'?[cancel,close]:[];
+  context.confirm=()=>{throw new Error('A native browser confirmation must not be shown');};
+  env.ui.bind();
+  return {...env,dialog,cancel,confirm,close,
+    open:()=>get('detail').onclick({target:{id:'delete-event',closest:()=>null}}),
+    submit:()=>get('delete-event-form').onsubmit({preventDefault(){}}),
+    escape:()=>{let prevented=false;dialog.listeners.get('cancel')?.({currentTarget:dialog,preventDefault(){prevented=true;}});if(!prevented)dialog.close();return prevented;},
+    backdrop:()=>dialog.listeners.get('click')?.({target:dialog,clientX:50,clientY:50}),
+  };
+}
+
+test('map rendering recovery dismisses its error overlay without reloading the historical view',async()=>{
+  const {context,get,ui}=app();let callbacks;
+  context.maplibregl={};
+  context.getComputedStyle=()=>({getPropertyValue:()=>''});
+  context.fetch=async()=>({ok:true,json:async()=>({})});
+  context.initMapView=options=>{callbacks=options;return {isFlat:()=>false,setTheme(){},setHistoryPlaces(){}};};
+  vm.runInContext('preferences={snapshot:()=>({})};',context);
+  Object.assign(ui.state,{events:[event('selected',1405)],places,selected:'selected',year:1405});
+  get('globe-error').hidden=true;
+  await vm.runInContext('initGlobe()',context);
+  callbacks.onRenderError();assert.equal(get('globe-error').hidden,false);
+  callbacks.onRenderRecovered();assert.equal(get('globe-error').hidden,true);
+  assert.equal(ui.state.selected,'selected');assert.equal(ui.state.year,1405);
+});
+
+test('delete confirmation names the record, focuses cancel and closes without sending a request',async()=>{
+  const env=deletionApp(),{ui,context,get,dialog}=env;let requests=0;
+  context.fetch=async()=>{requests++;throw new Error('Cancellation must not delete');};
+  Object.assign(ui.state,{events:[{...event('personal',1405,'<b>个人资料</b>'),userCreated:true}],places,
+    selected:'personal',year:1405,session:{interface:'local',canEdit:true}});
+  get('play').onclick();assert.equal(get('play').textContent,'Ⅱ');
+  env.open();
+  assert.equal(dialog.open,true);assert.equal(dialog.dataset.eventId,'personal');
+  assert.equal(get('delete-event-name').textContent,'<b>个人资料</b>');
+  assert.equal(get('delete-event-name').innerHTML,'');assert.equal(env.cancel.focused,true);
+  assert.equal(get('play').textContent,'▶');assert.equal(requests,0);
+  for(const cancel of [()=>env.cancel.onclick(),()=>env.close.onclick(),env.escape,env.backdrop]){
+    env.open();cancel();assert.equal(dialog.open,false);assert.equal(dialog.dataset.eventId,undefined);
+    await env.submit();assert.equal(requests,0);
+  }
+  assert.equal(ui.state.events.length,1);
+});
+
+test('delete confirmation keeps its original target and blocks repeated submission and dismissal while pending',async()=>{
+  const env=deletionApp(),{ui,context,get,dialog}=env,gate=deferred(),requests=[];
+  const personal=id=>({...event(id,1405),userCreated:true});
+  Object.assign(ui.state,{events:[personal('first/record'),personal('second')],places,
+    selected:'first/record',year:1405,scope:'all',session:{interface:'local',canEdit:true,token:'editor'}});
+  context.fetch=async(url,options)=>{requests.push({url,options});await gate.promise;return {ok:true,json:async()=>({deleted:true})};};
+  env.open();ui.state.selected='second';env.open();
+  const deleting=env.submit();await env.submit();
+  assert.equal(requests.length,1);assert.equal(requests[0].url,'/api/events/first%2Frecord');
+  assert.equal(requests[0].options.method,'DELETE');assert.equal(requests[0].options.headers['X-Edit-Token'],'editor');
+  assert.equal(dialog.dataset.busy,'true');assert.equal(dialog.getAttribute('aria-busy'),'true');
+  assert.ok([env.cancel,env.confirm,env.close].every(button=>button.disabled));
+  env.cancel.onclick();env.close.onclick();env.backdrop();assert.equal(env.escape(),true);
+  assert.equal(dialog.open,true);assert.equal(ui.state.events.length,2);
+  gate.resolve();await deleting;
+  assert.deepEqual(ui.state.events.map(record=>record.id),['second']);assert.equal(ui.state.selected,'second');
+  assert.equal(ui.state.places.length,places.length);assert.equal(dialog.open,false);
+  assert.equal(dialog.dataset.eventId,undefined);assert.equal(dialog.dataset.busy,'false');
+  assert.ok([env.cancel,env.confirm,env.close].every(button=>!button.disabled));
+  assert.equal(get('confirm-delete-event').textContent,'删除');
+  assert.equal(requests.length,1,'successful deletion must not depend on a second library request');
+});
+
+test('a rejected delete keeps the record and inline error available for retry',async()=>{
+  const env=deletionApp(),{ui,context,get,dialog}=env;let requests=0;
+  Object.assign(ui.state,{events:[{...event('personal',1405),userCreated:true}],places,
+    selected:'personal',year:1405,session:{interface:'local',canEdit:true}});
+  context.fetch=async()=>{requests++;return {ok:requests>1,json:async()=>requests===1?{error:'数据库暂时忙，请重试。'}:{deleted:true}};};
+  env.open();await env.submit();
+  assert.equal(dialog.open,true);assert.equal(dialog.dataset.eventId,'personal');
+  assert.equal(ui.state.events.length,1);assert.equal(ui.state.selected,'personal');
+  assert.equal(get('delete-event-error').hidden,false);assert.match(get('delete-event-error').textContent,/数据库暂时忙/);
+  assert.equal(dialog.dataset.busy,'false');assert.ok([env.cancel,env.confirm,env.close].every(button=>!button.disabled));
+  await env.submit();assert.equal(requests,2);assert.equal(dialog.open,false);
+  assert.equal(ui.state.events.length,0);assert.equal(get('delete-event-error').hidden,true);
+});
+
+test('delete guards reject builtin records and all non-local-editor sessions even if invoked directly',async()=>{
+  const cases=[
+    {session:{interface:'local',canEdit:true},userCreated:false},
+    {session:{interface:'web',canEdit:false},userCreated:true},
+    {session:{interface:'web',canEdit:true},userCreated:true},
+    {session:{interface:'local',canEdit:false},userCreated:true},
+  ];
+  for(const {session,userCreated} of cases){
+    const env=deletionApp(),{ui,context,dialog}=env;let requests=0;
+    Object.assign(ui.state,{events:[{...event('record',1405),userCreated}],places,selected:'record',session});
+    context.fetch=async()=>{requests++;throw new Error('Unauthorized deletion');};
+    env.open();assert.equal(dialog.open,false);
+    dialog.open=true;dialog.dataset.eventId='record';await env.submit();
+    assert.equal(requests,0);assert.equal(ui.state.events.length,1);
+  }
+});
+
+test('deleting the final custom city clears its point, filters, year bounds and stale map selection',async()=>{
+  const env=deletionApp(),{ui,context,get}=env,markers=[];
+  const site={id:'user-site',name:'测试遗址',isCustom:true,cityId:'custom-city',cityName:'测试城',countryCode:'CN',regionCode:'CN-custom',regionName:'测试地区',lon:109,lat:35};
+  Object.assign(ui.state,{events:[event('builtin',1405),{...event('personal',9999),placeId:site.id,userCreated:true}],
+    places:[...places,site],year:9999,max:9999,selected:'personal',scope:'year',category:'custom',
+    region:'CN-custom',city:'custom-city',meta:{userEventCount:1},session:{interface:'local',canEdit:true}});
+  ui.injectMapView({isFlat:()=>false,setHistoryPlaces:(visible,options)=>markers.push({visible,options})});
+  context.fetch=async()=>({ok:true,json:async()=>({deleted:true})});
+  ui.renderHistory();assert.deepEqual(markers.at(-1).visible.map(place=>place.id),[site.id]);
+  env.open();await env.submit();
+  assert.equal(ui.state.places.some(place=>place.id===site.id),false);assert.equal(ui.state.region,'all');assert.equal(ui.state.city,'all');
+  assert.equal(ui.state.category,'custom');assert.equal(ui.state.year,THIS_YEAR);assert.equal(ui.state.max,THIS_YEAR);
+  assert.equal(ui.state.selected,null);assert.equal(ui.state.meta.userEventCount,0);
+  assert.equal(markers.at(-1).visible.length,0);assert.equal(markers.at(-1).options.selectedPlaceId,undefined);
+  assert.doesNotMatch(get('city-filter').innerHTML,/custom-city/);assert.match(get('detail').innerHTML,/选择事件查看详情。/);
+});
 
 test('library refresh clamps a deleted outer year and keeps a still-visible selection after import',async()=>{
   const {ui,context,get}=app();
@@ -231,6 +352,28 @@ test('country selection resets location and period filters while preserving time
   assert.deepEqual({...markers.at(-1).options.counts},{paris:1});
   assert.equal(flights.at(-1).place.code,'FR');assert.equal(flights.at(-1).place.lon,2.2);
   assert.equal(flights.at(-1).place.lat,46.5);assert.equal(flights.at(-1).options.zoom,3.5);
+  assert.equal(flights.at(-1).options.milliseconds,undefined,'country navigation uses the shared location transition pace');
+});
+
+test('region selection delegates animated point and bounds navigation even under reduced motion',()=>{
+  const {ui,get}=app(),flights=[],bounds=[];
+  Object.assign(ui.state,{places,countryFeatures,events:[event('cn',1405)],year:1405});
+  ui.injectMapView({isFlat:()=>false,setHistoryPlaces(){},
+    flyPlace:(place,options)=>flights.push({place,options}),
+    fitBounds:(extent,options)=>bounds.push({extent,options})});
+  ui.bind();
+  get('region-filter').onchange({target:{value:'CN-BJ'}});
+  assert.equal(flights.at(-1).place.id,'beijing');
+  assert.equal(flights.at(-1).options.zoom,6);
+  assert.equal(flights.at(-1).options.milliseconds,undefined,'single-point regions use the shared location transition pace');
+  get('region-filter').onchange({target:{value:'CN-JS'}});
+  assert.equal(bounds.length,1);
+  assert.deepEqual(Array.from(bounds[0].extent,point=>Array.from(point)),[[118,31],[120,32]]);
+  assert.equal(bounds[0].options.maxZoom,7);
+  assert.equal(bounds[0].options.duration,undefined,'multiple-point regions use the same transition pace as single-point regions');
+  get('region-filter').onchange({target:{value:'all'}});
+  assert.equal(flights.at(-1).place.code,'CN');
+  assert.equal(flights.at(-1).options.milliseconds,undefined);
 });
 
 test('all countries combines records but keeps current-year map markers and country-specific eras',()=>{
@@ -413,14 +556,29 @@ test('large event lists render at most forty cards per page and pagination reach
   assert.match(get('event-list').innerHTML,/class="event-card active" data-event="event-41"/);
 });
 
-test('timeline migrates previous defaults once while preserving user-selected heights and resize limits',()=>{
+test('layout migrates previous defaults while preserving user-selected sizes and resize limits',()=>{
+  for (const [saved,widths] of [
+    [{},[240,260]],
+    [{layoutVersion:4,explorerWidth:300,detailWidth:324},[240,260]],
+    [{layoutVersion:4,explorerWidth:340,detailWidth:400},[340,400]],
+    [{layoutVersion:5,explorerWidth:300,detailWidth:324},[300,324]],
+  ]) {
+    const {context,get}=environment();context.saved=saved;
+    context.window.innerWidth=1600;get('.workspace').clientWidth=1600;
+    vm.runInContext(preferencesSource+'\n globalThis.prefs=initPreferences({persistLocally:false,initialPreferences:saved});',context);
+    assert.equal(context.prefs.snapshot().explorerWidth,widths[0]);
+    assert.equal(context.prefs.snapshot().detailWidth,widths[1]);
+    assert.equal(get('.workspace').style['--explorer-width'],`${widths[0]}px`);
+    assert.equal(get('.workspace').style['--detail-width'],`${widths[1]}px`);
+    context.prefs.destroy();
+  }
   for (const saved of [{},{timelineHeight:156},{layoutVersion:1,timelineHeight:156},
     {timelineHeight:124},{layoutVersion:2,timelineHeight:124},
     {timelineHeight:96},{layoutVersion:3,timelineHeight:96}]) {
     const {context,get}=environment();context.saved=saved;
     vm.runInContext(preferencesSource+'\n globalThis.prefs=initPreferences({persistLocally:false,initialPreferences:saved});',context);
     assert.equal(context.prefs.snapshot().timelineHeight,88);
-    assert.equal(context.prefs.snapshot().layoutVersion,4);
+    assert.equal(context.prefs.snapshot().layoutVersion,5);
     assert.equal(get('.workspace').style['--timeline-height'],'88px');
     assert.equal(get('timeline-resizer').getAttribute('aria-valuemin'),'88');
     for (const height of [96,124,156]) {

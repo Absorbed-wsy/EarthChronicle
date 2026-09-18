@@ -1,13 +1,16 @@
-import { buildMapStyle, isPlaceLayer } from './map-style.js';
+import { buildMapStyle, isPlaceLayer, LOCAL_FONTS } from './map-style.js';
 
 const HISTORY_SOURCE = 'chronicle-history';
 const HISTORY_LAYERS = ['history-clusters', 'history-cluster-labels', 'history-points', 'history-labels'];
 const DRAFT_SOURCE = 'chronicle-draft';
 const MAX_MARKER_LATITUDE = 85.0511287798066;
-const LOCAL_FONTS = ['Microsoft YaHei', 'Segoe UI', 'Arial', 'sans-serif'];
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const reducedMotion = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-const duration = (milliseconds = 650) => reducedMotion() ? 0 : milliseconds;
+// Keep deliberate map navigation animated, even when Windows disables decorative
+// effects. MapLibre also needs essential:true to retain the spatial transition.
+const cameraTransition = milliseconds => ({ duration: milliseconds, essential: true });
+// Ease into and out of location changes with zero endpoint speed/acceleration.
+const locationTransition = (milliseconds = 2400) => ({ ...cameraTransition(milliseconds), easing: t => t * t * t * (t * (6 * t - 15) + 10) });
 const HOME_CENTER = [111, 29];
 
 export function globeFitZoom(width, height) {
@@ -21,8 +24,8 @@ export function globeFitZoom(width, height) {
   return clamp(Math.log2(circumference / 512), -2, 19);
 }
 
-export function mapPixelRatio(quality, dpr = 1, width = 0, height = 0, moving = false) {
-  const profiles = { auto: [moving ? 1.5 : 2, 8e6], high: [moving ? 2 : 3, 12e6], smooth: [1, 4e6] };
+export function mapPixelRatio(quality, dpr = 1, width = 0, height = 0) {
+  const profiles = { auto: [2, 8e6], high: [3, 12e6], smooth: [1, 4e6] };
   const [limit, budget] = profiles[quality] || profiles.auto;
   const ratio = Math.min(clamp(Number(dpr) || 1, 1, 3), limit);
   const area = Number(width) * Number(height);
@@ -42,14 +45,18 @@ export function historyFeatures(places, { selectedPlaceId, counts = {} } = {}) {
   }) };
 }
 
-export function initMapView({ maplibregl: M, container = 'globe', baseStyle, preferences = {}, onHistoryPlace = () => {}, onPickPoint = () => {}, onProjectionChange = () => {}, onStatus = () => {}, onNotice = () => {}, onRenderError = () => {} } = {}) {
+export function initMapView({ maplibregl: M, container = 'globe', baseStyle, preferences = {}, onHistoryPlace = () => {}, onPickPoint = () => {}, onProjectionChange = () => {}, onStatus = () => {}, onNotice = () => {}, onRenderError = () => {}, onRenderRecovered = () => {} } = {}) {
   if (!M?.Map) throw new Error('地图组件未能加载');
   const element = typeof container === 'string' ? document.getElementById(container) : container;
   let settings = { mapSource: 'roads', mapTerrain: true, mapQuality: 'auto', ...preferences };
   let theme = document.documentElement.dataset.theme || 'light';
-  let flat = false, labels = true, ready = false, destroyed = false, moving = false, terrainFailed = false, notified = false, restTimer, fitOverview = true;
-  let history = historyFeatures([]), lastRatio, selectedPlaceId, styleSerial = 0, onlineReady = false, onlineContent = false;
-  let picking = false, draftPoint = null, navigationSerial = 0;
+  let flat = false, labels = true, ready = false, destroyed = false, terrainFailed = false, notified = false, fitOverview = true;
+  let history = historyFeatures([]), selectedPlaceId, styleSerial = 0, onlineReady = false, onlineContent = false;
+  let historySignature = JSON.stringify(history);
+  let mapWidth = element.clientWidth, mapHeight = element.clientHeight;
+  let lastRatio = mapPixelRatio(settings.mapQuality, window.devicePixelRatio, element.clientWidth, element.clientHeight);
+  let picking = false, draftPoint = null, navigationSerial = 0, changingQuality = false;
+  let contextLost = false, recoveryPending = false;
   const failures = new Set();
   const style = () => {
     // Keep elevation available across style changes in flat view; only the 3D mesh is disabled there.
@@ -60,11 +67,11 @@ export function initMapView({ maplibregl: M, container = 'globe', baseStyle, pre
   const map = new M.Map({
     container: element, style: style(), center: HOME_CENTER, zoom: globeFitZoom(element.clientWidth, element.clientHeight), pitch: 0, bearing: 0,
     minZoom: -2, maxZoom: 19, maxPitch: 60, maxTileCacheSize: 160, maxTileCacheZoomLevels: 3,
-    cancelPendingTileRequestsWhileZooming: true, renderWorldCopies: false,
+    cancelPendingTileRequestsWhileZooming: true, renderWorldCopies: false, trackResize: false,
     fadeDuration: reducedMotion() ? 0 : 180,
-    pixelRatio: mapPixelRatio(settings.mapQuality, window.devicePixelRatio, element.clientWidth, element.clientHeight),
+    pixelRatio: lastRatio,
     canvasContextAttributes: { antialias: true }, attributionControl: { compact: false },
-    localIdeographFontFamily: 'Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif',
+    localIdeographFontFamily: false,
     locale: { 'AttributionControl.ToggleAttribution': '地图资料来源', 'Map.Title': '地球史书地图' },
   });
   const controls = { projection: document.getElementById('map-projection'), north: document.getElementById('north-view'), tilt: document.getElementById('map-tilt') };
@@ -77,11 +84,15 @@ export function initMapView({ maplibregl: M, container = 'globe', baseStyle, pre
   for (const event of inputEvents) canvas.addEventListener(event, preserveUserView, { passive: true });
 
   function quality() {
-    if (destroyed) return;
-    const ratio = mapPixelRatio(settings.mapQuality, window.devicePixelRatio, element.clientWidth, element.clientHeight, moving);
+    if (destroyed || changingQuality) return;
+    const ratio = mapPixelRatio(settings.mapQuality, window.devicePixelRatio, element.clientWidth, element.clientHeight);
     if (Math.abs(ratio - (lastRatio || 0)) < .001) return;
     lastRatio = ratio;
-    map.setPixelRatio(ratio);
+    // Resize only for an actual quality/display change. Camera movement keeps
+    // the same sharp canvas and never reallocates its render buffers.
+    changingQuality = true;
+    try { map.setPixelRatio(ratio); }
+    finally { changingQuality = false; }
   }
   function syncControls() {
     const { projection, north, tilt } = controls;
@@ -167,11 +178,15 @@ export function initMapView({ maplibregl: M, container = 'globe', baseStyle, pre
     if (!ready) return;
     for (const layer of map.getStyle().layers) if (layer.type === 'symbol' && (isPlaceLayer(layer) || layer.id === 'history-labels' || layer.id === 'history-cluster-labels')) {
       const baseHidden = onlineReady && layer.metadata?.['earthchronicle:base-label'];
-      map.setLayoutProperty(layer.id, 'visibility', labels && !baseHidden ? 'visible' : 'none');
+      const visibility = labels && !baseHidden ? 'visible' : 'none';
+      if ((layer.layout?.visibility ?? 'visible') !== visibility) map.setLayoutProperty(layer.id, 'visibility', visibility);
     }
   }
   function syncOnlineLayers() {
-    if (!ready || !map.getLayer('online-background')) return;
+    if (destroyed || !ready || !map.getLayer('online-background')) return;
+    // Loading each new batch of tiles must not repeatedly hide/show the base
+    // labels during a flight: visibility changes reparse their GeoJSON tiles.
+    if (map.isMoving()) return;
     const complete = onlineContent && !failures.has('openmaptiles') && map.isSourceLoaded('openmaptiles');
     if (complete === onlineReady) return;
     onlineReady = complete;
@@ -204,14 +219,30 @@ export function initMapView({ maplibregl: M, container = 'globe', baseStyle, pre
   });
   on('sourcedataloading', event => { if (event.sourceId === 'openmaptiles') syncOnlineLayers(); });
   on('idle', syncOnlineLayers);
-  on('webglcontextlost', onRenderError);
-  on('webglcontextrestored', () => { if (!destroyed) rebuild(); });
-  on('move', syncControls);
+  // stop() can immediately be followed by another flight. Let that flight
+  // start before deciding whether it is safe to update the base labels.
+  on('moveend', () => queueMicrotask(syncOnlineLayers));
+  on('webglcontextlost', event => {
+    if (destroyed) return;
+    contextLost = true; recoveryPending = false; ready = false;
+    syncControls(); onRenderError(event);
+  });
+  on('webglcontextrestored', () => {
+    if (destroyed) return;
+    recoveryPending = contextLost; contextLost = false;
+    rebuild();
+  });
+  on('render', () => {
+    // Loading the replacement style is not yet a successful draw. Only a
+    // rendered frame after a known context loss can dismiss its error overlay.
+    if (destroyed || contextLost || !ready || !recoveryPending) return;
+    recoveryPending = false; onRenderRecovered();
+  });
+  on('rotate', syncControls);
+  on('pitch', syncControls);
   on('movestart', event => {
     if (event.originalEvent) fitOverview = false;
-    clearTimeout(restTimer); moving = true; quality();
   });
-  on('moveend', () => { clearTimeout(restTimer); restTimer = setTimeout(() => { moving = false; quality(); }, 100); });
 
   function interactiveFeatures(point) {
     if (!ready) return [];
@@ -219,12 +250,12 @@ export function initMapView({ maplibregl: M, container = 'globe', baseStyle, pre
     if (!layers.length) return [];
     return map.queryRenderedFeatures([[point.x - 3, point.y - 3], [point.x + 3, point.y + 3]], { layers });
   }
-  function flyPlace(place, { zoom = 11, milliseconds = 1100 } = {}) {
+  function flyPlace(place, { zoom = 11, milliseconds } = {}) {
     const lon = Number(place?.lon ?? place?.lng), lat = Number(place?.lat);
     if (destroyed || !Number.isFinite(lon) || !Number.isFinite(lat)) return;
     preserveUserView();
     map.stop();
-    map.flyTo({ center: [lon, clamp(lat, -85.051129, 85.051129)], zoom: clamp(zoom, 0, 19), pitch: flat ? 0 : map.getPitch(), bearing: map.getBearing(), duration: duration(milliseconds) });
+    map.flyTo({ center: [lon, clamp(lat, -85.051129, 85.051129)], zoom: clamp(zoom, 0, 19), pitch: flat ? 0 : map.getPitch(), bearing: map.getBearing(), ...locationTransition(milliseconds) });
   }
   on('click', async event => {
     const navigation = ++navigationSerial;
@@ -254,7 +285,7 @@ export function initMapView({ maplibregl: M, container = 'globe', baseStyle, pre
       const serial = styleSerial, source = map.getSource(HISTORY_SOURCE);
       try {
         const zoom = await source.getClusterExpansionZoom(historical.properties.cluster_id);
-        if (!destroyed && serial === styleSerial && navigation === navigationSerial) flyPlace({ lon: historical.geometry.coordinates[0], lat: historical.geometry.coordinates[1] }, { zoom: Math.max(zoom, map.getZoom() + 1), milliseconds: 650 });
+        if (!destroyed && serial === styleSerial && navigation === navigationSerial) flyPlace({ lon: historical.geometry.coordinates[0], lat: historical.geometry.coordinates[1] }, { zoom: Math.max(zoom, map.getZoom() + 1), milliseconds: 1200 });
       } catch { /* A style change may cancel the cluster request. */ }
       return;
     }
@@ -281,19 +312,26 @@ export function initMapView({ maplibregl: M, container = 'globe', baseStyle, pre
   function toggleTilt() {
     if (!ready || flat) return;
     preserveUserView();
-    map.stop(); map.easeTo({ pitch: map.getPitch() > 20 ? 0 : 50, duration: duration(500) });
+    map.stop(); map.easeTo({ pitch: map.getPitch() > 20 ? 0 : 50, ...cameraTransition(500) });
   }
   if (controls.projection) controls.projection.onclick = toggleProjection;
-  if (controls.north) controls.north.onclick = () => { preserveUserView(); map.stop(); map.easeTo({ bearing: 0, duration: duration(500) }); };
+  if (controls.north) controls.north.onclick = () => { preserveUserView(); map.stop(); map.easeTo({ bearing: 0, ...cameraTransition(500) }); };
   if (controls.tilt) controls.tilt.onclick = toggleTilt;
   const resize = () => {
     if (destroyed) return;
-    map.resize();
+    const width = element.clientWidth, height = element.clientHeight;
+    const ratio = mapPixelRatio(settings.mapQuality, window.devicePixelRatio, width, height);
+    const sizeChanged = width !== mapWidth || height !== mapHeight;
+    const ratioChanged = Math.abs(ratio - lastRatio) >= .001;
+    if (!sizeChanged && !ratioChanged) return;
+    mapWidth = width; mapHeight = height;
+    // setPixelRatio already resizes the canvas; never allocate it twice.
+    if (ratioChanged) quality();
+    else map.resize();
     if (fitOverview && !flat && element.clientWidth > 0 && element.clientHeight > 0) {
       const zoom = globeFitZoom(element.clientWidth, element.clientHeight);
       if (Math.abs(map.getZoom() - zoom) > .001) { map.stop(); map.jumpTo({ center: HOME_CENTER, zoom, pitch: 0, bearing: 0 }); }
     }
-    quality();
   };
   const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(resize) : null;
   observer?.observe(element);
@@ -304,10 +342,10 @@ export function initMapView({ maplibregl: M, container = 'globe', baseStyle, pre
 
   return {
     map, isFlat: () => flat, resize, retry, flyPlace, toggleProjection, toggleTilt, setPicking, setDraftPoint,
-    fitBounds(bounds, options = {}) { preserveUserView(); map.stop(); map.fitBounds(bounds, options); },
-    home() { ++navigationSerial; fitOverview = !flat; map.stop(); map.flyTo({ center: flat ? [0, 15] : HOME_CENTER, zoom: flat ? 0 : globeFitZoom(element.clientWidth, element.clientHeight), pitch: 0, bearing: 0, duration: duration(1000) }); },
-    zoomIn() { preserveUserView(); map.zoomIn({ duration: duration(250) }); },
-    zoomOut() { preserveUserView(); map.zoomOut({ duration: duration(250) }); },
+    fitBounds(bounds, options = {}) { preserveUserView(); map.stop(); map.fitBounds(bounds, { ...options, ...locationTransition(options.duration) }); },
+    home() { ++navigationSerial; fitOverview = !flat; map.stop(); map.flyTo({ center: flat ? [0, 15] : HOME_CENTER, zoom: flat ? 0 : globeFitZoom(element.clientWidth, element.clientHeight), pitch: 0, bearing: 0, ...locationTransition() }); },
+    zoomIn() { preserveUserView(); map.zoomIn(cameraTransition(250)); },
+    zoomOut() { preserveUserView(); map.zoomOut(cameraTransition(250)); },
     applyPreferences(next) {
       const oldSource = settings.mapSource, oldTerrain = settings.mapTerrain;
       settings = { ...settings, ...next };
@@ -319,12 +357,14 @@ export function initMapView({ maplibregl: M, container = 'globe', baseStyle, pre
     setHistoryPlaces(places, options = {}) {
       selectedPlaceId = options.selectedPlaceId;
       if (options.labels !== undefined) labels = options.labels !== false;
-      history = historyFeatures(places, { ...options, selectedPlaceId });
-      if (ready) { map.getSource(HISTORY_SOURCE)?.setData(history); applyLabels(); }
+      const next = historyFeatures(places, { ...options, selectedPlaceId });
+      const signature = JSON.stringify(next), changed = signature !== historySignature;
+      history = next; historySignature = signature;
+      if (ready) { if (changed) map.getSource(HISTORY_SOURCE)?.setData(history); applyLabels(); }
     },
     destroy() {
       if (destroyed) return;
-      destroyed = true; clearTimeout(restTimer); observer?.disconnect();
+      destroyed = true; observer?.disconnect();
       window.removeEventListener('online', retry); window.removeEventListener('resize', resize);
       for (const event of inputEvents) canvas.removeEventListener(event, preserveUserView);
       for (const [event, listener] of listeners) map.off(event, listener);

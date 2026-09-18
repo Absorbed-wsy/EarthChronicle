@@ -105,7 +105,7 @@ function focusRegion(){
   const places=regionalPlaces().filter(p=>Number.isFinite(p.lon)&&Number.isFinite(p.lat));
   if(!places.length)return;
   if(places.length===1){mapView.flyPlace(places[0],{zoom:6});return;}
-  mapView.fitBounds([[Math.min(...places.map(p=>p.lon)),Math.min(...places.map(p=>p.lat))],[Math.max(...places.map(p=>p.lon)),Math.max(...places.map(p=>p.lat))]],{padding:60,maxZoom:7,pitch:0,duration:matchMedia('(prefers-reduced-motion: reduce)').matches?0:800});
+  mapView.fitBounds([[Math.min(...places.map(p=>p.lon)),Math.min(...places.map(p=>p.lat))],[Math.max(...places.map(p=>p.lon)),Math.max(...places.map(p=>p.lat))]],{padding:60,maxZoom:7,pitch:0});
 }
 function homeView(){mapView?.home();}
 function syncMapControls(){
@@ -125,6 +125,7 @@ async function initGlobe(){
     onProjectionChange:syncMapControls,
     onPickPoint:point=>eventEditor?.pickPoint(point),
     onRenderError:()=>{$('globe-error').hidden=false;},
+    onRenderRecovered:()=>{$('globe-error').hidden=true;},
     onHistoryPlace:placeId=>{
       stopPlayback();
       const place=placeIndex().get(placeId);state.countryCode=place?.countryCode||'all';updateBounds();
@@ -137,8 +138,7 @@ async function initGlobe(){
 }
 function step(delta){setYear(state.year+delta);}
 async function loadCountryCatalog(){try{const response=await fetch('/maps/country-labels.geojson');if(response.ok)state.countryFeatures=await response.json();}catch{/* Available historical places still populate the country selector. */}}
-async function refreshLibrary({startToday=false}={}){
-  const library=await api('/api/library');
+function applyLibrary(library,{startToday=false}={}){
   state.events=library.events;state.places=library.places;state.meta=library.meta;
   updateBounds();
   if(startToday){state.period='all';updateBounds();state.year=currentYear();state.selected=null;state.scope='year';}
@@ -149,7 +149,43 @@ async function refreshLibrary({startToday=false}={}){
   reconcileSelection();
   $('category').innerHTML='<option value="all">全部类型</option><option value="custom">自定义</option>'+CATEGORIES.map(c=>`<option>${h(c)}</option>`).join('');
 }
-function showSources(){const sources=[...new Map(state.events.filter(e=>!e.userCreated&&safeSourceUrl(e.sourceUrl)).map(e=>[e.sourceUrl,{title:e.sourceTitle,url:e.sourceUrl}])).values()];$('sources-content').innerHTML=`<p>地球史书 v${h(state.session.version || '0.3')}</p><h3>历史资料</h3><p>本版收录 ${state.events.filter(e=>!e.userCreated).length} 条明初示例事件，提供摘要与出处。年份之外的月日未在时间轴中展开；无事件的年份表示尚未收录。</p><p>城市坐标用于阅读导航，不能当作古代遗址的精确定位。地图为现代道路与地形，不代表事件发生时的道路或疆域。</p><div class="source-list">${sources.map(s=>`<a href="${h(s.url)}" target="_blank" rel="noopener noreferrer">${h(s.title)} ↗</a>`).join('')}</div><h3>显示与数据</h3><p>地图使用 MapLibre、OpenFreeMap / OpenStreetMap 道路数据和 Mapzen 高程数据；附带 Natural Earth 全球基础地图。详细道路及地形按视野联网加载。中文译名和当地名称以数据源提供的内容为准。</p>`;$('sources-dialog').showModal();}
+async function refreshLibrary(options){applyLibrary(await api('/api/library'),options);}
+function openDeleteDialog(){
+  const event=state.events.find(item=>item.id===state.selected),dialog=$('delete-event-dialog');
+  if(!canEdit()||!event?.userCreated||dialog.open||dialog.dataset.busy==='true')return;
+  stopPlayback();dialog.dataset.eventId=event.id;
+  $('delete-event-name').textContent=event.title;
+  $('delete-event-error').textContent='';$('delete-event-error').hidden=true;
+  dialog.showModal();$('cancel-delete-event').focus();
+}
+async function deleteEvent(event){
+  event.preventDefault();
+  const dialog=$('delete-event-dialog'),id=dialog.dataset.eventId;
+  const record=state.events.find(item=>item.id===id);
+  if(!dialog.open||dialog.dataset.busy==='true'||!canEdit()||!record?.userCreated)return;
+  const controls=[...dialog.querySelectorAll('button')];
+  dialog.dataset.busy='true';dialog.setAttribute('aria-busy','true');
+  for(const button of controls)button.disabled=true;
+  $('confirm-delete-event').textContent='删除中…';
+  $('delete-event-error').textContent='';$('delete-event-error').hidden=true;
+  try{
+    await api('/api/events/'+encodeURIComponent(id),{method:'DELETE'});
+    // The delete has completed. Update the known library immediately so a
+    // separate refresh failure cannot leave a deleted record available to retry.
+    const events=state.events.filter(item=>item.id!==id);
+    const places=state.places.filter(place=>place.id!==record.placeId||!place.isCustom||events.some(item=>item.placeId===place.id));
+    applyLibrary({events,places,meta:{...state.meta,userEventCount:events.filter(item=>item.userCreated).length}});
+    renderHistory();dialog.close();toast('个人记录已删除');
+    ($('event-list').querySelector('.event-card.active')||$('event-list').querySelector('.event-card')||$('add-button')).focus({preventScroll:true});
+  }catch(error){
+    $('delete-event-error').textContent=error.message;$('delete-event-error').hidden=false;
+  }finally{
+    dialog.dataset.busy='false';dialog.setAttribute('aria-busy','false');
+    for(const button of controls)button.disabled=false;
+    $('confirm-delete-event').textContent='删除';
+  }
+}
+function showSources(){const sources=[...new Map(state.events.filter(e=>!e.userCreated&&safeSourceUrl(e.sourceUrl)).map(e=>[e.sourceUrl,{title:e.sourceTitle,url:e.sourceUrl}])).values()];$('sources-content').innerHTML=`<p>地球史书 v${h(state.session.version || '0.1.0')}</p><h3>历史资料</h3><p>本版收录 ${state.events.filter(e=>!e.userCreated).length} 条明初示例事件，提供摘要与出处。年份之外的月日未在时间轴中展开；无事件的年份表示尚未收录。</p><p>城市坐标用于阅读导航，不能当作古代遗址的精确定位。地图为现代道路与地形，不代表事件发生时的道路或疆域。</p><div class="source-list">${sources.map(s=>`<a href="${h(s.url)}" target="_blank" rel="noopener noreferrer">${h(s.title)} ↗</a>`).join('')}</div><h3>显示与数据</h3><p>地图使用 MapLibre、OpenFreeMap / OpenStreetMap 道路数据和 Mapzen 高程数据；附带 Natural Earth 全球基础地图。详细道路及地形按视野联网加载。中文译名和当地名称以数据源提供的内容为准。</p>`;$('sources-dialog').showModal();}
 function bind(){
   const changed=()=>{stopPlayback();state.page=0;renderHistory();};
   $('scope').onchange=e=>{state.scope=e.target.value;changed();};$('category').onchange=e=>{state.category=e.target.value;changed();};
@@ -160,7 +196,10 @@ function bind(){
   $('year-filter').onchange=e=>{if(e.target.value==='')return;stopPlayback();state.scope='year';setYear(Number(e.target.value),{refresh:true});};
   $('period-filter').onchange=e=>{stopPlayback();state.period=e.target.value;updateBounds();state.scope='all';setYear(Math.max(state.min,Math.min(state.max,state.year)),{refresh:true});};
   $('event-list').onclick=e=>{const event=e.target.closest('[data-event]');if(event)selectEvent(event.dataset.event,{fly:true});const page=e.target.closest('[data-page]');if(page&&!page.disabled){state.page=Number(page.dataset.page);renderList();$('event-list').scrollTop=0;}if(e.target.id==='browse-region'){state.scope='all';changed();}if(e.target.id==='clear-filters'){state.category='all';state.query='';$('search').value='';changed();}};
-  $('detail').onclick=async e=>{const related=e.target.closest('[data-related]');if(related)selectEvent(related.dataset.related,{fly:true});if(e.target.id==='fly-place')flyPlace(placeOf(state.events.find(x=>x.id===state.selected)));if(e.target.id==='edit-event')openEventForm(state.events.find(x=>x.id===state.selected));if(e.target.id==='delete-event'){if(!confirm('删除这条个人记录？'))return;try{await api('/api/events/'+encodeURIComponent(state.selected),{method:'DELETE'});await refreshLibrary();renderHistory();toast('个人记录已删除');}catch(error){toast(error.message);}}};
+  $('detail').onclick=e=>{const related=e.target.closest('[data-related]');if(related)selectEvent(related.dataset.related,{fly:true});if(e.target.id==='fly-place')flyPlace(placeOf(state.events.find(x=>x.id===state.selected)));if(e.target.id==='edit-event')openEventForm(state.events.find(x=>x.id===state.selected));if(e.target.id==='delete-event')openDeleteDialog();};
+  $('delete-event-form').onsubmit=deleteEvent;
+  $('delete-event-dialog').addEventListener('cancel',e=>{if(e.currentTarget.dataset.busy==='true')e.preventDefault();});
+  $('delete-event-dialog').addEventListener('close',()=>{delete $('delete-event-dialog').dataset.eventId;});
   const enteredYear=()=>{const n=Number($('year-input').value);if(!Number.isInteger(n)||n<1||n>9999){syncYearInputs();return;}stopPlayback();const year=$('year-era').value==='bce'?1-n:n;if(year<state.min||year>state.max){state.period='all';updateBounds();}setYear(year);};
   $('year-input').onchange=enteredYear;$('year-input').onkeydown=e=>{if(e.key==='Enter')enteredYear();};$('year-era').onchange=enteredYear;$('time-slider').oninput=e=>{stopPlayback();setYear(e.target.value);};$('event-dots').onclick=e=>{const b=e.target.closest('[data-year]');if(b){stopPlayback();setYear(b.dataset.year);}};
   $('previous-year').onclick=()=>{stopPlayback();step(-1);};$('next-year').onclick=()=>{stopPlayback();step(1);};$('jump-start').onclick=()=>{stopPlayback();setYear(state.min);};$('jump-end').onclick=()=>{stopPlayback();setYear(state.max);};

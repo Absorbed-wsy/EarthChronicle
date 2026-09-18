@@ -1,11 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {readFile,readdir} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import {inflateSync} from 'node:zlib';
 import {buildMapStyle} from '../public/map-style.js';
 
 const root=new URL('../',import.meta.url),publicRoot=new URL('public/',root);
 const readJson=async url=>JSON.parse(await readFile(url,'utf8'));
+test('release version agrees across the package, native executable and manifest',async()=>{
+  const {version}=await readJson(new URL('package.json',root));
+  assert.match(version,/^\d+\.\d+\.\d+$/);
+  const [native,manifest,server]=await Promise.all(['desktop/EarthChronicle.cs','desktop/app.manifest','server.mjs'].map(file=>readFile(new URL(file,root),'utf8')));
+  for(const field of ['AssemblyVersion','AssemblyFileVersion'])assert.equal(native.match(new RegExp(`${field}\\("([^"]+)"\\)`))?.[1],`${version}.0`);
+  assert.equal(native.match(/version="([^"]+)"/)?.[1],version,'native state version');
+  assert.equal(manifest.match(/assemblyIdentity version="([^"]+)"/)?.[1],`${version}.0`);
+  assert.equal(server.match(/VERSION='([^']+)'/)?.[1],version,'HTTP API version');
+});
 const baseStyle=await readJson(new URL('maps/liberty.json',publicRoot));
 const offline=buildMapStyle({online:false,baseStyle});
 const pngSignature=Buffer.from([137,80,78,71,13,10,26,10]);
@@ -94,6 +104,30 @@ test('offline map source files are complete GeoJSON with valid closed land and b
     const data=await readJson(publicFile(source.data));assert.equal(data.type,'FeatureCollection');assert.ok(data.features.length,`${id}: empty map`);
     for(const feature of data.features){assert.equal(feature.type,'Feature');geometry(feature.geometry);}
   }
+});
+
+test('bundled map glyph ranges are complete and match their published byte counts and checksums',async()=>{
+  const directory=new URL('maps/fonts/noto-sans/',publicRoot);
+  const manifest=await readJson(new URL('manifest.json',directory));
+  assert.equal(manifest.font,'Noto Sans Regular');
+  assert.equal(manifest.license,'OFL-1.1');
+  assert.ok(new URL(manifest.source).protocol==='https:','font provenance must name its original source');
+  const expected=Array.from({length:256},(_,index)=>`${index*256}-${index*256+255}.pbf`).sort();
+  const listed=manifest.files.map(item=>item.file).sort();
+  assert.deepEqual(listed,expected,'all basic multilingual plane ranges must ship with the application');
+  assert.deepEqual((await readdir(directory)).filter(file=>file.endsWith('.pbf')).sort(),listed,'manifest and distributed glyph files must agree');
+  let totalBytes=0,totalGlyphs=0;
+  for(const entry of manifest.files){
+    assert.match(entry.sha256,/^[a-f0-9]{64}$/);
+    assert.ok(Number.isInteger(entry.bytes)&&entry.bytes>0,`${entry.file}: invalid byte count`);
+    assert.ok(Number.isInteger(entry.glyphCount)&&entry.glyphCount>=0&&entry.glyphCount<=256,`${entry.file}: invalid glyph count`);
+    const bytes=await readFile(new URL(entry.file,directory));
+    assert.equal(bytes.length,entry.bytes,`${entry.file}: incomplete glyph file`);
+    assert.equal(createHash('sha256').update(bytes).digest('hex'),entry.sha256,`${entry.file}: glyph file checksum mismatch`);
+    totalBytes+=bytes.length;totalGlyphs+=entry.glyphCount;
+  }
+  assert.equal(totalBytes,manifest.bytes);
+  assert.equal(totalGlyphs,manifest.glyphCount);
 });
 
 const spritePath=new URL(offline.sprite).pathname;
@@ -187,7 +221,7 @@ test('HTML assets and local module imports resolve from source before dependency
 });
 
 test('redistributed map, desktop and runtime assets include their required license files',async()=>{
-  const licenses=['LICENSE','runtime/LICENSE.txt','licenses/WebView2/LICENSE.txt','licenses/WebView2/NOTICE.txt','licenses/maps/OpenFreeMap-LICENSE.md','licenses/maps/OSM-Liberty-LICENSE.md','licenses/maps/Maki-LICENSE.txt'];
+  const licenses=['LICENSE','runtime/LICENSE.txt','licenses/WebView2/LICENSE.txt','licenses/WebView2/NOTICE.txt','licenses/maps/OpenFreeMap-LICENSE.md','licenses/maps/OSM-Liberty-LICENSE.md','licenses/maps/Maki-LICENSE.txt','licenses/maps/Noto-OFL.txt','licenses/maps/NotoCJK-OFL.txt'];
   for(const file of licenses){const text=await readFile(new URL(file,root),'utf8');assert.ok(text.trim().length>100,`${file}: missing or truncated license`);}
   const notices=await readFile(new URL('THIRD-PARTY-NOTICES.md',root),'utf8');
   for(const match of notices.matchAll(/\]\(((?:licenses|runtime)\/[^)]+)\)/g))assert.ok((await readFile(new URL(match[1],root))).length,`broken local license reference: ${match[1]}`);

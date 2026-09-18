@@ -9,7 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {networkInterfaces,tmpdir} from 'node:os';
 import {randomBytes,timingSafeEqual} from 'node:crypto';
 import {openChronicleDatabase,RequestError,MAX_DATABASE_BYTES} from './database.mjs';
-const ROOT=path.dirname(fileURLToPath(import.meta.url)),VERSION='0.6.0';
+const ROOT=path.dirname(fileURLToPath(import.meta.url)),VERSION='0.1.0';
 const MIME={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.json':'application/json; charset=utf-8','.wasm':'application/wasm','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.ico':'image/x-icon','.woff':'font/woff','.woff2':'font/woff2','.bin':'application/octet-stream','.ktx2':'image/ktx2','.xml':'application/xml; charset=utf-8','.txt':'text/plain; charset=utf-8'};
 const loopback=address=>['127.0.0.1','::1','::ffff:127.0.0.1'].includes(address);
 const json=(res,status,value)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value));};

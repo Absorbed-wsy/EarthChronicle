@@ -22,3 +22,5 @@ jobs:
         run: ./desktop/test.ps1
       - name: Build Windows executable
         run: ./desktop/build.ps1
+      - name: Package Windows portable release
+        run: ./desktop/package.ps1 -SkipBuild

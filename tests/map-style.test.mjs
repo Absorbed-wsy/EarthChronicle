@@ -4,10 +4,18 @@ import {readFile} from 'node:fs/promises';
 import {buildMapStyle,isPlaceLayer,LOCAL_FONTS} from '../public/map-style.js';
 
 const baseStyle=JSON.parse(await readFile(new URL('../public/maps/liberty.json',import.meta.url),'utf8'));
+function bundledGlyphs(style,origin='http://localhost') {
+  assert.ok(style.glyphs.includes('{range}')&&style.glyphs.includes('{fontstack}'),'glyph URL must preserve MapLibre substitution fields');
+  const fontstack=LOCAL_FONTS.join(',');
+  const url=new URL(style.glyphs.replace('{range}','19968-20223').replace('{fontstack}',encodeURIComponent(fontstack)));
+  assert.equal(url.origin,origin,'font requests stay on the application server instead of an external glyph service');
+  assert.equal(url.pathname,'/maps/fonts/noto-sans/19968-20223.pbf');
+  assert.equal(url.searchParams.get('fontstack'),fontstack,'the requested font stack remains a valid encoded query value');
+}
 
 test('bundled overview works without any online tile, font or sprite dependency',()=>{
   const style=buildMapStyle({online:false,baseStyle});
-  assert.equal(style.glyphs,undefined);
+  bundledGlyphs(style);
   assert.equal(style.sources.openmaptiles,undefined);
   assert.equal(style.sources.terrain,undefined);
   for(const source of Object.values(style.sources))assert.match(source.data,/^\/maps\/[a-z-]+\.geojson$/);
@@ -21,7 +29,7 @@ test('online detail keeps local fonts, bilingual names and the bundled fallback 
     const style=buildMapStyle({theme,online:true,terrain:true,baseStyle});
     assert.equal(style.sources.openmaptiles.url,'https://tiles.openfreemap.org/planet');
     assert.equal(style.sources.terrain.encoding,'terrarium');
-    assert.equal(style.glyphs,undefined);
+    bundledGlyphs(style);
     assert.equal(style.sources.ne2_shaded,undefined);
     assert.equal(style.layers.find(l=>l.id==='online-background').layout.visibility,'none');
     for(const layer of style.layers.filter(isPlaceLayer)) {
@@ -29,10 +37,30 @@ test('online detail keeps local fonts, bilingual names and the bundled fallback 
       assert.match(JSON.stringify(layer.layout['text-field']),/name:zh-Hans/);
       assert.match(JSON.stringify(layer.layout['text-field']),/"name"/);
     }
+    for(const layer of style.layers.filter(layer=>layer.layout?.['text-field'])) {
+      assert.deepEqual(layer.layout['text-font'],LOCAL_FONTS);
+    }
     assert.equal(new Set(style.layers.map(l=>l.id)).size,style.layers.length);
   }
   assert.equal(JSON.stringify(baseStyle),original,'theme changes must not mutate the source style');
   assert.equal(buildMapStyle({terrain:false,baseStyle}).sources.terrain,undefined);
+});
+
+test('local map fonts include installed Chinese and Latin font families',()=>{
+  assert.deepEqual(LOCAL_FONTS,['Microsoft YaHei','Segoe UI','Arial','sans-serif'],
+    'installed families remain available as fallback if a bundled glyph cannot load');
+});
+
+test('both map modes request prebuilt glyphs from the current desktop or content-server origin',()=>{
+  const previous=globalThis.location;
+  try {
+    for(const href of ['http://127.0.0.1:8743/','http://192.168.0.10:8123/','https://chronicle.example/history/']) {
+      globalThis.location={href};
+      for(const online of [true,false])bundledGlyphs(buildMapStyle({online,baseStyle}),new URL(href).origin);
+    }
+  } finally {
+    if(previous===undefined)delete globalThis.location;else globalThis.location=previous;
+  }
 });
 
 test('bundled places include real Chinese names, unique stable ids and valid coordinates',async()=>{

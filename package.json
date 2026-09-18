@@ -1,6 +1,6 @@
 {
   "name": "earth-chronicle",
-  "version": "0.6.0",
+  "version": "0.1.0",
   "private": true,
   "description": "A Windows desktop globe and history reader with an optional read-only content server",
   "type": "module",

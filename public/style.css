@@ -82,7 +82,7 @@ button[hidden], [hidden] { display: none !important; }
 .accent-button span { font-size: 19px; margin-right: 5px; }
 
 /* Widths are set by the splitters; hiding a panel releases its whole column. */
-.workspace { --explorer-default: 300px; --detail-default: 324px; height: calc(100dvh - var(--topbar-height)); min-height: calc(346px + var(--timeline-height, 88px)); display: grid; grid-template-columns: var(--explorer-width, var(--explorer-default)) 6px minmax(0, 1fr) 6px var(--detail-width, var(--detail-default)); grid-template-rows: minmax(340px, 1fr) 6px var(--timeline-height, 88px); }
+.workspace { --explorer-default: 240px; --detail-default: 260px; height: calc(100dvh - var(--topbar-height)); min-height: calc(346px + var(--timeline-height, 88px)); display: grid; grid-template-columns: var(--explorer-width, var(--explorer-default)) 6px minmax(0, 1fr) 6px var(--detail-width, var(--detail-default)); grid-template-rows: minmax(340px, 1fr) 6px var(--timeline-height, 88px); }
 .workspace.explorer-collapsed { grid-template-columns: 0 0 minmax(0, 1fr) 6px var(--detail-width, var(--detail-default)); }
 .workspace.detail-collapsed { grid-template-columns: var(--explorer-width, var(--explorer-default)) 6px minmax(0, 1fr) 0 0; }
 .workspace.explorer-collapsed.detail-collapsed { grid-template-columns: 0 0 minmax(0, 1fr) 0 0; }
@@ -260,6 +260,14 @@ select option { background: var(--panel); color: var(--text); }
 .form-row label { flex: 1; min-width: 0; }
 .form-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
 .form-error { color: var(--danger); font-size: 13px; min-height: 10px; }
+.modal.confirm-modal { width: min(400px, calc(100vw - 32px)); padding: 24px; }
+.confirm-modal .modal-heading { align-items: center; margin-bottom: 18px; }
+.confirm-modal h2 { margin: 0; font-size: 21px; }
+.confirm-modal p { margin: 10px 0; }
+.confirm-event-name { font-weight: 600; overflow-wrap: anywhere; }
+.confirm-modal .form-actions { gap: 10px; margin-top: 22px; }
+.confirm-modal .form-actions button { min-width: 76px; }
+.danger-button { background: var(--danger); color: var(--header); }
 .toast { position: fixed; bottom: 175px; left: 50%; transform: translateX(-50%); background: var(--toast-bg); color: var(--toast-ink); padding: 12px 22px; border-radius: 6px; box-shadow: 0 4px 35px var(--shadow); z-index: 100; max-width: 90vw; font-size: 14px; }
 .library-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 22px 0; }
 .library-stat { border: 1px solid var(--line); padding: 17px; background: var(--button-bg); border-radius: 5px; }
@@ -315,13 +323,11 @@ select option { background: var(--panel); color: var(--text); }
 .settings-section .library-stat { padding: 14px 17px; }
 
 @media (min-width: 1600px) {
-  .workspace { --explorer-default: 330px; --detail-default: 360px; }
   .explorer-heading { padding: 34px 28px 25px; } .explorer-heading h1 { font-size: 28px; }
   .detail { padding: 34px; } .detail h2 { font-size: 29px; } .event-card { padding: 20px 16px; }
   .event-card h3, .detail-summary { font-size: 15px; } .time-display { padding-left: 34px; padding-right: 34px; }
 }
 @media (max-width: 1200px) {
-  .workspace { --explorer-default: 265px; --detail-default: 285px; }
   .topbar { padding: 0 20px; gap: 15px; }  .header-actions { gap: 9px; }
   .detail { padding: 24px 20px; } .explorer-heading { padding: 23px 20px 18px; } .explorer-heading h1 { font-size: 23px; }
   .search-box { margin-left: 20px; margin-right: 20px; } .filter-row { padding-left: 20px; padding-right: 20px; }
@@ -329,7 +335,7 @@ select option { background: var(--panel); color: var(--text); }
   .time-display { width: 205px; padding-left: 24px; }
 }
 @media (max-width: 950px) {
-  .workspace, .workspace.detail-collapsed { --explorer-default: 280px; height: auto; min-height: calc(100dvh - var(--topbar-height)); grid-template-columns: var(--explorer-width, var(--explorer-default)) 6px minmax(0, 1fr) 0 0; grid-template-rows: 500px 6px var(--timeline-height, 88px) auto; }
+  .workspace, .workspace.detail-collapsed { --explorer-default: 240px; height: auto; min-height: calc(100dvh - var(--topbar-height)); grid-template-columns: var(--explorer-width, var(--explorer-default)) 6px minmax(0, 1fr) 0 0; grid-template-rows: 500px 6px var(--timeline-height, 88px) auto; }
   .workspace.timeline-collapsed { grid-template-rows: 500px 0 0 auto; }
   .workspace.explorer-collapsed, .workspace.explorer-collapsed.detail-collapsed { grid-template-columns: 0 0 minmax(0, 1fr) 0 0; }
   .topbar { gap: 12px; } .brand b { font-size: 21px; } .brand svg { width: 35px; height: 35px; } .brand small { font-size: 8px; }

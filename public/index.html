@@ -30,14 +30,14 @@
       <div id="event-list" class="event-list" aria-live="polite"><div class="loading-state">加载中…</div></div>
       <footer class="explorer-footer"><span id="coverage">世界历史</span><button id="sources-button" class="text-button">资料来源 ↗</button></footer>
     </aside>
-    <div id="explorer-resizer" class="panel-resizer" role="separator" tabindex="0" aria-label="调整事件列表宽度" aria-orientation="vertical" aria-controls="explorer" aria-valuemin="240" aria-valuemax="440" aria-valuenow="300" title="拖动调整列表宽度；也可用左右方向键"></div>
+    <div id="explorer-resizer" class="panel-resizer" role="separator" tabindex="0" aria-label="调整事件列表宽度" aria-orientation="vertical" aria-controls="explorer" aria-valuemin="240" aria-valuemax="440" aria-valuenow="240" title="拖动调整列表宽度；也可用左右方向键"></div>
     <section class="earth-stage" aria-label="交互式地图">
       <div id="globe"></div>
       <div id="map-pick-bar" class="map-pick-bar" hidden role="status"><span>点击地图选择位置</span><button id="cancel-map-pick" type="button">取消</button></div>
       <div id="globe-error" class="globe-error" hidden><b>地球画面暂时无法显示</b><p>请使用支持 WebGL 2 的 Edge 或 Chrome，并开启浏览器硬件加速。事件阅读仍然可用。</p><button id="retry-globe" class="quiet-button">重新载入</button></div>
       <div class="map-controls" aria-label="地图视角"><button id="map-projection" title="展开为平面地图" aria-label="展开为平面地图" aria-pressed="false" disabled>2D</button><button id="map-tilt" title="倾斜查看地形" aria-label="倾斜查看地形" aria-pressed="false" disabled>斜</button><button id="north-view" title="朝北 · 点击恢复北向上" aria-label="朝北" disabled><span class="compass-arrow" aria-hidden="true">▲</span><small aria-hidden="true">N</small></button><button id="home-view" title="返回地球全景" aria-label="返回地球全景">◎</button><button id="zoom-in" title="放大" aria-label="放大">＋</button><button id="zoom-out" title="缩小" aria-label="缩小">−</button><button id="labels-toggle" class="active" title="显示地名" aria-label="显示地名" aria-pressed="true">名</button></div>
     </section>
-    <div id="detail-resizer" class="panel-resizer" role="separator" tabindex="0" aria-label="调整详情面板宽度" aria-orientation="vertical" aria-controls="detail" aria-valuemin="260" aria-valuemax="480" aria-valuenow="324" title="拖动调整详情宽度；也可用左右方向键"></div>
+    <div id="detail-resizer" class="panel-resizer" role="separator" tabindex="0" aria-label="调整详情面板宽度" aria-orientation="vertical" aria-controls="detail" aria-valuemin="260" aria-valuemax="480" aria-valuenow="260" title="拖动调整详情宽度；也可用左右方向键"></div>
     <aside id="detail" class="detail" aria-label="事件详情"><div class="detail-empty"><span class="eyebrow">EVENT DETAILS</span><h2>事件详情</h2><p>选择事件查看详情。</p></div></aside>
     <div id="timeline-resizer" class="timeline-resizer" role="separator" tabindex="0" aria-label="调整时间轴高度" aria-orientation="horizontal" aria-controls="timeline" aria-valuemin="88" aria-valuemax="300" aria-valuenow="88" title="上下拖动调整时间轴高度"></div>
     <section id="timeline" class="timeline" aria-label="时间轴">
@@ -57,6 +57,16 @@
     <div class="form-row"><label>来源名称 <span class="optional">可选</span><input name="sourceTitle" maxlength="300" placeholder="个人记录"></label><label>来源链接 <span class="optional">可选</span><input name="sourceUrl" type="url" maxlength="2000" placeholder="https://"></label></div>
     <p id="form-error" class="form-error" role="alert"></p><div class="form-actions"><button type="button" data-close="event-dialog" class="quiet-button">取消</button><button type="submit" class="accent-button">保存</button></div>
   </form></dialog>
+  <dialog id="delete-event-dialog" class="modal confirm-modal" role="alertdialog" aria-labelledby="delete-event-heading" aria-describedby="delete-event-message delete-event-name delete-event-warning">
+    <form id="delete-event-form">
+      <div class="modal-heading"><h2 id="delete-event-heading">删除事件</h2><button type="button" data-close="delete-event-dialog" class="close-button" aria-label="关闭">×</button></div>
+      <p id="delete-event-message">确定删除此自定义事件？</p>
+      <p id="delete-event-name" class="confirm-event-name"></p>
+      <p id="delete-event-warning" class="muted">事件及其地图标记将一并移除，无法撤销。</p>
+      <p id="delete-event-error" class="form-error" role="alert" hidden></p>
+      <div class="form-actions"><button id="cancel-delete-event" type="button" data-close="delete-event-dialog" class="quiet-button" autofocus>取消</button><button id="confirm-delete-event" type="submit" class="accent-button danger-button">删除</button></div>
+    </form>
+  </dialog>
   <dialog id="settings-dialog" class="modal settings-modal" aria-labelledby="settings-title">
     <div class="modal-heading settings-heading"><h2 id="settings-title">设置</h2><button data-close="settings-dialog" class="close-button" aria-label="关闭设置">×</button></div>
     <div class="settings-tabs" role="tablist" aria-label="设置分类"><button id="appearance-settings-tab" class="active" role="tab" aria-selected="true" aria-controls="appearance-settings" data-settings-tab="appearance">外观与显示</button><button id="map-settings-tab" role="tab" aria-selected="false" aria-controls="map-settings" data-settings-tab="map">地图</button><button id="server-settings-tab" role="tab" aria-selected="false" aria-controls="server-settings" data-settings-tab="server" hidden>内容服务器</button><button id="database-settings-tab" role="tab" aria-selected="false" aria-controls="database-settings" data-settings-tab="database" hidden>数据库</button></div>

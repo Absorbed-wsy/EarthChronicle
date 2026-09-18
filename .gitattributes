@@ -9,6 +9,7 @@
 *.cmd text eol=crlf
 *.cs text eol=crlf
 *.geojson text eol=lf
+*.pbf binary
 # Preserve upstream license text, including its whitespace.
 licenses/** -whitespace
 runtime/LICENSE.txt -whitespace

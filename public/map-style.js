@@ -104,6 +104,8 @@ export function buildMapStyle({theme = 'light', online = true, terrain = true, b
     paint:{'text-color':color.ink,'text-halo-color':color.halo,'text-halo-width':1.5},
   });
   layers.push(baseLabel('base-place-countries','base-countries-labels',true),baseLabel('base-place-cities','base-cities',false));
-  // All fonts and icon sheets are local. Only visible detail tiles use the network.
-  return {version:8,name:'EarthChronicle',projection:{type:'globe'},sprite:new URL('/maps/sprite',globalThis.location?.href||'http://localhost/').href,sources,layers};
+  // Prepared glyphs stay local so new place names do not block camera frames
+  // with font rasterization. Keep the system stack for MapLibre's read fallback.
+  const glyphs = new URL('/maps/fonts/noto-sans/',globalThis.location?.href||'http://localhost/').href+'{range}.pbf?fontstack={fontstack}';
+  return {version:8,name:'EarthChronicle',projection:{type:'globe'},glyphs,sprite:new URL('/maps/sprite',globalThis.location?.href||'http://localhost/').href,sources,layers};
 }

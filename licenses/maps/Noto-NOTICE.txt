@@ -1,0 +1,109 @@
+Noto map glyph attribution
+
+The bundled PBF glyph files are unmodified copies of the Noto Sans Regular
+multiscript glyph set distributed by OpenFreeMap:
+https://tiles.openfreemap.org/fonts/Noto%20Sans%20Regular/{range}.pbf
+
+OpenFreeMap identifies Noto Sans as licensed under SIL Open Font License 1.1:
+https://github.com/hyperknot/openfreemap/blob/main/LICENSE.md#fonts
+
+The PBF fontstack identifies the 23 Noto font families listed below. Their
+original font copyright and license records are retained from the corresponding
+OpenMapTiles source font files. The original font files are not bundled.
+https://github.com/openmaptiles/fonts/tree/master/noto-sans
+
+All of these source fonts identify SIL Open Font License 1.1 in their license
+metadata. The full license is included in Noto-OFL.txt and NotoCJK-OFL.txt.
+Noto-OFL.txt also retains the current Noto Project Authors copyright notice.
+
+NotoNaskhArabic-Regular.ttf
+Copyright 2014 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoNaskhArabic-Regular.ttf
+
+NotoSans-Regular.ttf
+Copyright 2012 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSans-Regular.ttf
+
+NotoSansArmenian-Regular.ttf
+Copyright 2014 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansArmenian-Regular.ttf
+
+NotoSansBalinese-Regular.ttf
+Copyright 2013 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansBalinese-Regular.ttf
+
+NotoSansBengali-Regular.ttf
+Copyright 2013 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansBengali-Regular.ttf
+
+NotoSansCJKtc-Regular.otf
+Copyright © 2014, 2015 Adobe Systems Incorporated (http://www.adobe.com/).
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansCJKtc-Regular.otf
+
+NotoSansDevanagari-Regular.ttf
+Copyright 2012 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansDevanagari-Regular.ttf
+
+NotoSansEthiopic-Regular.ttf
+Copyright 2012 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansEthiopic-Regular.ttf
+
+NotoSansGeorgian-Regular.ttf
+Copyright 2012 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansGeorgian-Regular.ttf
+
+NotoSansGujarati-Regular.ttf
+Copyright 2013 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansGujarati-Regular.ttf
+
+NotoSansGurmukhi-Regular.ttf
+Copyright 2013 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansGurmukhi-Regular.ttf
+
+NotoSansHebrew-Regular.ttf
+Copyright 2012 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansHebrew-Regular.ttf
+
+NotoSansJavanese-Regular.ttf
+Copyright 2013 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansJavanese-Regular.ttf
+
+NotoSansKannada-Regular.ttf
+Copyright 2013 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansKannada-Regular.ttf
+
+NotoSansKhmer-Regular.ttf
+Copyright 2012 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansKhmer-Regular.ttf
+
+NotoSansLao-Regular.ttf
+Copyright 2012 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansLao-Regular.ttf
+
+NotoSansMongolian-Regular.ttf
+Copyright 2013 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansMongolian-Regular.ttf
+
+NotoSansMyanmar-Regular.ttf
+Copyright 2013 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansMyanmar-Regular.ttf
+
+NotoSansOriya-Regular.ttf
+Copyright 2015 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansOriya-Regular.ttf
+
+NotoSansSinhala-Regular.ttf
+Copyright 2014 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansSinhala-Regular.ttf
+
+NotoSansTamil-Regular.ttf
+Copyright 2012 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansTamil-Regular.ttf
+
+NotoSansThai-Regular.ttf
+Copyright 2011 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansThai-Regular.ttf
+
+NotoSansTibetan-Regular.ttf
+Copyright 2015 Google Inc. All Rights Reserved.
+Source: https://raw.githubusercontent.com/openmaptiles/fonts/master/noto-sans/NotoSansTibetan-Regular.ttf

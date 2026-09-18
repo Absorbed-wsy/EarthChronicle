@@ -1,8 +1,8 @@
 const STORAGE_KEY = 'earthchronicle.preferences.v1';
 const THEMES = new Set(['light', 'paper', 'night']);
 const PANEL_LIMITS = {
-  explorer: { min: 240, max: 440, initial: 300, label: '事件列表' },
-  detail: { min: 260, max: 480, initial: 324, label: '详情面板' },
+  explorer: { min: 240, max: 440, initial: 240, label: '事件列表' },
+  detail: { min: 260, max: 480, initial: 260, label: '详情面板' },
 };
 const TIMELINE_LIMITS = { min: 88, max: 300, initial: 88 };
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -12,7 +12,8 @@ function normalizePreferences(saved) {
   const preferences = { theme: THEMES.has(saved.theme) ? saved.theme : 'light' };
   for (const [name, limits] of Object.entries(PANEL_LIMITS)) {
     const width = saved[`${name}Width`];
-    preferences[`${name}Width`] = Number.isFinite(width)
+    const previousPanelDefault = (saved.layoutVersion ?? 0) < 5 && width === { explorer: 300, detail: 324 }[name];
+    preferences[`${name}Width`] = Number.isFinite(width) && !previousPanelDefault
       ? clamp(width, limits.min, limits.max) : limits.initial;
     preferences[`${name}Collapsed`] = saved[`${name}Collapsed`] === true;
   }
@@ -21,7 +22,7 @@ function normalizePreferences(saved) {
     || ((saved.layoutVersion === undefined || saved.layoutVersion === 1) && saved.timelineHeight === 156);
   preferences.timelineHeight = Number.isFinite(saved.timelineHeight) && !previousDefault
     ? Math.round(clamp(saved.timelineHeight, TIMELINE_LIMITS.min, TIMELINE_LIMITS.max)) : TIMELINE_LIMITS.initial;
-  preferences.layoutVersion = 4;
+  preferences.layoutVersion = 5;
   preferences.timelineCollapsed = saved.timelineCollapsed === true;
   preferences.mapSource = saved.mapSource === 'offline' ? 'offline' : 'roads';
   preferences.mapTerrain = saved.mapTerrain !== false;

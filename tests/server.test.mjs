@@ -72,11 +72,11 @@ test('content server is optional, web is read-only even on localhost, port colli
  const dir=await mkdtemp(path.join(tmpdir(),'earthchronicle-test-'));let local,blocker;
  try{
   local=await host(path.join(dir,'local.sqlite'));assert.equal((await local.request('/api/settings').then(r=>r.json())).contentServer.enabled,false);
-  const ordinarySession=await fetch(local.base+'/api/session').then(r=>r.json());assert.equal(ordinarySession.interface,'web');assert.equal(ordinarySession.canEdit,false);assert.equal(ordinarySession.token,null);assert.equal(ordinarySession.version,'0.6.0');
+  const ordinarySession=await fetch(local.base+'/api/session').then(r=>r.json());assert.equal(ordinarySession.interface,'web');assert.equal(ordinarySession.canEdit,false);assert.equal(ordinarySession.token,null);assert.equal(ordinarySession.version,'0.1.0');
   assert.equal((await fetch(local.base+'/api/library')).status,403);assert.equal((await fetch(local.base+'/api/geology/manifest')).status,404);assert.equal((await fetch(local.base+'/api/geology/66')).status,404);
   for(const wrongKey of ['', 'bad', 'f'.repeat(64)]){const session=await fetch(local.base+'/api/session',{headers:{'X-Desktop-Key':wrongKey}}).then(r=>r.json());assert.equal(session.canEdit,false);assert.equal(session.token,null);}
-  for(const file of ['/','/app.js','/style.css','/maps/liberty.json']){const response=await fetch(local.base+file);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('x-earth-chronicle-version'),'0.6.0');await response.arrayBuffer();}
-  const health=await fetch(local.base+'/api/health').then(r=>r.json());assert.deepEqual(health,{appId:'earth-chronicle',version:'0.6.0'});
+  for(const file of ['/','/app.js','/style.css','/maps/liberty.json']){const response=await fetch(local.base+file);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('x-earth-chronicle-version'),'0.1.0');await response.arrayBuffer();}
+  const health=await fetch(local.base+'/api/health').then(r=>r.json());assert.deepEqual(health,{appId:'earth-chronicle',version:'0.1.0'});
   // Old browser tabs may retain the previous edit token. It must be useless
   // without the native application's key, even from this same computer.
   const adminRoutes=[['/api/settings','GET'],['/api/preferences','GET'],['/api/preferences','PUT','{}'],['/api/database/export','GET'],['/api/database/import','POST','x'],['/api/content-server','PUT','{}'],['/api/events','POST',JSON.stringify(example)],['/api/events/user-fake','PUT',JSON.stringify(example)],['/api/events/user-fake','DELETE'],['/api/shutdown','POST','{}']];
