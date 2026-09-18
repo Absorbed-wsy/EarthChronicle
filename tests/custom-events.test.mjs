@@ -67,8 +67,9 @@ test('map points belong to individual events and edits retain IDs without changi
 
 test('free locations have stable searchable region/city IDs and may omit a city', async t => {
   const f = await fixture(t), db = await f.open();
-  const first = db.saveEvent(input(freePoint));
-  const second = db.saveEvent(input({ ...freePoint, name: '另一地点', lon: 2.4 }));
+  const unlistedPoint = { ...freePoint, regionName: '未收录测试地区' };
+  const first = db.saveEvent(input(unlistedPoint));
+  const second = db.saveEvent(input({ ...unlistedPoint, name: '另一地点', lon: 2.4 }));
   assert.ok(first.location.regionCode.startsWith('FR:region:'));
   assert.ok(first.location.cityId.startsWith('FR:city:'));
   assert.equal(first.location.cityId, second.location.cityId);

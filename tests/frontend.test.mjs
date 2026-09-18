@@ -101,6 +101,17 @@ test('map rendering recovery dismisses its error overlay without reloading the h
   assert.equal(ui.state.selected,'selected');assert.equal(ui.state.year,1405);
 });
 
+test('historical details expose verified dates and distinct safe sources while retaining annual filtering',()=>{
+  const {ui,get}=app();
+  const record={...event('prc-test',1949,'建国资料'),date:'1949-10-01',precision:'day',sourceTitle:'主要资料',sourceUrl:'https://example.com/main',sources:[{title:'重复来源',url:'https://example.com/main'},{title:'补充档案',url:'https://example.com/archive'},{title:'无效来源',url:'javascript:alert(1)'}]};
+  Object.assign(ui.state,{places,events:[record],selected:record.id,year:1949,countryCode:'CN',scope:'year'});
+  ui.renderHistory();
+  const detail=get('detail').innerHTML;
+  assert.match(detail,/1949年10月1日/);assert.equal((detail.match(/https:\/\/example.com\/main/g)||[]).length,1);
+  assert.match(detail,/补充档案/);assert.doesNotMatch(detail,/javascript:|无效来源|应天/);
+  ui.setYear(1950);assert.doesNotMatch(get('event-list').innerHTML,/data-event="prc-test"/);
+});
+
 test('delete confirmation names the record, focuses cancel and closes without sending a request',async()=>{
   const env=deletionApp(),{ui,context,get,dialog}=env;let requests=0;
   context.fetch=async()=>{requests++;throw new Error('Cancellation must not delete');};

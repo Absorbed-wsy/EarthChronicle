@@ -54,6 +54,24 @@ const historyHash = (db, legacy = false) => createHash('sha256').update(JSON.str
   .map(row => row.kind === 'place' && Object.hasOwn(REFERENCE_REGIONS, row.id)
     ? { ...row, payload: JSON.stringify(placeWithReferenceRegion(parseJson(row.payload), row.id)) }
     : row))).digest('hex');
+const historyEntries = history => {
+  if (!history || !history.meta || !Array.isArray(history.events) || !Array.isArray(history.places)) throw new Error('初始资料格式有误。');
+  return [['history-meta', 'main', history.meta], ...history.places.map(p => ['place', p.id, p]), ...history.events.map(e => ['history-event', e.id, e])];
+};
+const entriesHash = entries => createHash('sha256').update(JSON.stringify(entries
+  .map(([kind, id, value]) => ({ kind, id, payload: JSON.stringify(kind === 'place' ? placeWithReferenceRegion(value, id) : value) }))
+  .sort((a, b) => a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0))).digest('hex');
+async function readHistoryCatalog(publicDir) {
+  let text;
+  try { text = await readFile(path.join(publicDir, 'data', 'catalog.json'), 'utf8'); }
+  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  const manifest = parseJson(text);
+  if (manifest.format !== 1 || typeof manifest.revision !== 'string' || !/^[a-f0-9]{64}$/.test(manifest.sha256)
+    || !Array.isArray(manifest.previous) || manifest.previous.some(hash => typeof hash !== 'string' || !/^[a-f0-9]{64}$/.test(hash))) throw new Error('内置资料版本清单无效。');
+  const entries = historyEntries(parseJson(await readFile(path.join(publicDir, 'data', 'history.json'), 'utf8')));
+  if (entriesHash(entries) !== manifest.sha256) throw new Error('内置资料文件校验失败，请重新获取完整的软件文件夹。');
+  return { entries, current: manifest.sha256, compatible: new Set([manifest.sha256, ...manifest.previous]) };
+}
 const validTimestamp = (value) => typeof value === 'string' && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 function nextTimestamp(previous) {
   // Imported records may come from a computer whose clock is ahead of ours.
@@ -90,6 +108,34 @@ function validateLocation(input, places, persisted = false) {
     cityId = generatedCityId;
   }
   return { name, lon, lat, countryCode, regionCode, regionName, cityId, cityName };
+}
+
+// Catalogue additions can give an old free-form location a reference region
+// or city. Resolve only its public search association; never rewrite the user's
+// point, stored event, or merge timestamps as a side effect of opening a library.
+function referenceLocationProjector(places) {
+  const regions = new Map(), cities = new Map();
+  const key = (country, region, city) => JSON.stringify([country, normalizedName(region || ''), ...(city === undefined ? [] : [normalizedName(city || '')])]);
+  const addUnique = (index, name, place, identity) => {
+    if (!index.has(name)) index.set(name, place);
+    else if (index.get(name)?.[identity] !== place[identity]) index.set(name, null);
+  };
+  for (const place of places.values()) {
+    if (place.regionName && place.regionCode) addUnique(regions, key(place.countryCode, place.regionName), place, 'regionCode');
+    if (place.name) addUnique(cities, key(place.countryCode, place.regionName, place.name), place, 'id');
+  }
+  return location => {
+    const linkedCity = places.get(location.cityId);
+    const city = linkedCity?.countryCode === location.countryCode ? linkedCity
+      : location.cityName ? cities.get(key(location.countryCode, location.regionName, location.cityName)) : null;
+    if (city) return {
+      ...location, regionCode: city.regionCode || '', regionName: city.regionName || '', cityId: city.id, cityName: city.name,
+      // A county's prefecture applies to personal points too; its site aliases do not.
+      ...(city.parentCity ? { parentCity: city.parentCity } : {}),
+    };
+    const region = location.regionName && regions.get(key(location.countryCode, location.regionName));
+    return region ? { ...location, regionCode: region.regionCode, regionName: region.regionName } : location;
+  };
 }
 
 export function validateEvent(input, places, id = null, { persisted = false } = {}) {
@@ -154,12 +200,14 @@ export async function openChronicleDatabase({ databasePath, publicDir }) {
     const seeded = names.has('metadata') ? db.prepare("SELECT value FROM metadata WHERE key='canonicalHash'").get() : null;
     if (seeded && seeded.value !== canonicalHash(db)) throw new Error('内置只读资料校验失败，请从原始备份恢复。');
     if (!seeded && names.has('canonical_records') && db.prepare('SELECT count(*) AS count FROM canonical_records').get().count) throw new Error('内置资料未完整初始化，请保留数据库并检查文件。');
+    const catalog = await readHistoryCatalog(publicDir);
     let entries = [];
     if (!seeded) {
-      const history = parseJson(await readFile(path.join(publicDir, 'data', 'history.json'), 'utf8'));
-      if (!Array.isArray(history.events) || !Array.isArray(history.places)) throw new Error('初始资料格式有误。');
-      entries = [['history-meta', 'main', history.meta], ...history.places.map(p => ['place', p.id, p]), ...history.events.map(e => ['history-event', e.id, e])];
+      entries = catalog?.entries ?? historyEntries(parseJson(await readFile(path.join(publicDir, 'data', 'history.json'), 'utf8')));
     }
+    const previousHistoryHash = seeded ? historyHash(db, oldVersion < 4) : null;
+    if (seeded && catalog && !catalog.compatible.has(previousHistoryHash)) throw new Error('内置只读资料版本无法核验，请保留数据库并从兼容的原始备份恢复。');
+    const upgradeHistory = seeded && catalog && previousHistoryHash !== catalog.current && catalog.compatible.has(previousHistoryHash);
     // Validate the complete old read-only corpus before changing its hash. The
     // same transaction upgrades legacy personal rows and retires obsolete data.
     db.exec('PRAGMA secure_delete=ON; BEGIN IMMEDIATE');
@@ -184,6 +232,13 @@ export async function openChronicleDatabase({ databasePath, publicDir }) {
         const payload = JSON.stringify(placeWithReferenceRegion(parseJson(row.payload), row.id));
         if (payload !== row.payload) updatePlace.run(payload, row.id);
       }
+      if (upgradeHistory) {
+        // Only an exact, published prior corpus can upgrade. Personal rows,
+        // preferences and server settings are never part of this replacement.
+        db.exec('DELETE FROM canonical_records');
+        const insert = db.prepare('INSERT INTO canonical_records(kind,id,payload) VALUES (?,?,?)');
+        for (const [kind, id, payload] of catalog.entries) insert.run(kind, id, JSON.stringify(payload));
+      }
       db.prepare("INSERT INTO metadata(key,value) VALUES ('canonicalHash',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(canonicalHash(db));
       db.exec(`PRAGMA user_version=${SCHEMA_VERSION}; PRAGMA application_id=${APPLICATION_ID}; COMMIT`);
     } catch (error) { db.exec('ROLLBACK'); throw error; }
@@ -197,6 +252,7 @@ export async function openChronicleDatabase({ databasePath, publicDir }) {
     const selectKind = db.prepare('SELECT payload FROM canonical_records WHERE kind=? ORDER BY id');
     const selectCanonical = db.prepare('SELECT payload FROM canonical_records WHERE kind=? AND id=?');
     const canonicalPlaces = new Map(selectKind.all('place').map((row) => { const place = parseJson(row.payload); return [place.id, place]; }));
+    const projectLocation = referenceLocationProjector(canonicalPlaces);
     const getCanonical = (kind, id) => { const row = selectCanonical.get(kind, String(id)); return row ? parseJson(row.payload) : null; };
     const userGet = db.prepare('SELECT id, payload, created_at, updated_at FROM user_events WHERE id=?');
     const userPut = db.prepare('INSERT INTO user_events(id,payload,created_at,updated_at) VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at');
@@ -208,7 +264,7 @@ export async function openChronicleDatabase({ databasePath, publicDir }) {
       close() { db.close(); },
       library() {
         const personal = userAll.all().map(publicEvent);
-        const places = [...selectKind.all('place').map(row => parseJson(row.payload)), ...personal.filter(event => event.location).map(event => ({ ...event.location, id: event.placeId, isCustom: true, userCreated: true }))];
+        const places = [...selectKind.all('place').map(row => parseJson(row.payload)), ...personal.filter(event => event.location).map(event => ({ ...projectLocation(event.location), id: event.placeId, isCustom: true, userCreated: true }))];
         return { meta: getCanonical('history-meta', 'main'), places, events: [...selectKind.all('history-event').map((row) => ({ ...parseJson(row.payload), origin: 'bundled', userCreated: false })), ...personal] };
       },
       counts() { const count = kind => Number(db.prepare('SELECT count(*) AS count FROM canonical_records WHERE kind=?').get(kind).count); return { schemaVersion: SCHEMA_VERSION, historyEvents: count('history-event'), places: count('place'), personalEvents: Number(db.prepare('SELECT count(*) AS count FROM user_events').get().count) }; },
@@ -255,7 +311,8 @@ export async function openChronicleDatabase({ databasePath, publicDir }) {
           // Old backups have no reference-region fields. Normalize only those
           // additions after checking the original checksum; all other content
           // must still match, including the entire event text and place data.
-          if (historyHash(source, sourceVersion < 4) !== historyHash(db)) throw new RequestError(400, '数据库中的内置历史资料与当前版本不一致，不能导入修改过的只读资料。');
+          const sourceHistory = historyHash(source, sourceVersion < 4), targetHistory = historyHash(db);
+          if (sourceHistory !== targetHistory && !(catalog?.compatible.has(sourceHistory) && targetHistory === catalog.current)) throw new RequestError(400, '数据库中的内置历史资料与当前版本不一致，不能导入修改过的只读资料。');
           const metadataKeys = source.prepare('SELECT key FROM metadata').all().map(row => row.key);
           if (metadataKeys.some(key => !['canonicalHash', 'appId'].includes(key) && !(sourceVersion === 3 && isRetiredMetadata(key))) || source.prepare('SELECT count(*) AS count FROM settings').get().count !== 1) throw new RequestError(400, '数据库设置结构异常。');
           const configuration = parseJson(source.prepare("SELECT value FROM settings WHERE key='contentServer'").get()?.value);

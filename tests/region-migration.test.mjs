@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
-import { mkdtemp, rm, copyFile } from 'node:fs/promises';
+import { mkdtemp, rm, copyFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,6 +11,8 @@ import { CATEGORIES } from '../public/domain.js';
 
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 const regionKeys = ['countryCode', 'regionCode', 'regionName'];
+const originalPlaces = new Set(['nanjing','taicang','beijing','fengyang','xian']);
+const bundled = JSON.parse(await readFile(new URL('../public/data/history.json', import.meta.url),'utf8'));
 const personal = { title: '保留个人记录', year: 2026, placeId: 'nanjing', category: '文化', summary: '迁移前的个人内容', sourceTitle: '个人资料', sourceUrl: '' };
 const hash = db => createHash('sha256').update(JSON.stringify(db.prepare('SELECT kind,id,payload FROM canonical_records ORDER BY kind,id').all())).digest('hex');
 function updateHash(db) { db.prepare("UPDATE metadata SET value=? WHERE key='canonicalHash'").run(hash(db)); }
@@ -32,6 +34,7 @@ async function oldDatabase(file, version = 4) {
     const put = raw.prepare("UPDATE canonical_records SET payload=? WHERE kind='place' AND id=?");
     for (const row of raw.prepare("SELECT id,payload FROM canonical_records WHERE kind='place'").all()) {
       const place = JSON.parse(row.payload);
+      if (!originalPlaces.has(place.id)) continue;
       for (const key of regionKeys) delete place[key];
       put.run(JSON.stringify(place), row.id);
     }
@@ -49,9 +52,9 @@ test('opening an existing database persists modern reference regions without cha
     const { event, oldHash } = await oldDatabase(file);
     database = await openChronicleDatabase({ databasePath: file, publicDir: path.join(directory, 'no-seed-files') });
     const library = database.library();
-    assert.equal(library.places.length, 5);
-    assert.deepEqual(library.places.filter(place => place.regionCode === 'CN-32').map(place => place.id).sort(), ['nanjing', 'taicang']);
-    assert.ok(library.places.every(place => place.countryCode === 'CN' && place.regionName));
+    assert.equal(library.places.length, bundled.places.length);
+    assert.deepEqual(library.places.filter(place => originalPlaces.has(place.id) && place.regionCode === 'CN-32').map(place => place.id).sort(), ['nanjing', 'taicang']);
+    assert.ok(library.places.filter(place => originalPlaces.has(place.id)).every(place => place.countryCode === 'CN' && place.regionName));
     assert.equal(library.places.find(place => place.id === 'beijing').regionCode, 'CN-11');
     assert.equal(library.places.find(place => place.id === 'fengyang').regionName, '安徽省');
     assert.equal(library.places.find(place => place.id === 'xian').regionName, '陕西省');

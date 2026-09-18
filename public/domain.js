@@ -31,7 +31,7 @@ export function eventMatches(event, {year,scope='year',city='all',category='all'
   const search=(query||'').trim().toLowerCase();
   if(!search) return true;
   const inferredEra=!place?.countryCode || place.countryCode==='CN'?eraForYear(event.year):'';
-  const text=[event.title,event.summary,event.era,inferredEra,yearLabel(event.year),event.category,place?.regionName,place?.cityName,place?.name,place?.historicalName,...(place?.aliases||[])].join(' ').toLowerCase();
+  const text=[event.title,event.summary,event.date,event.era,inferredEra,yearLabel(event.year),event.category,place?.regionName,place?.parentCity,place?.cityName,place?.name,place?.historicalName,...(place?.aliases||[])].join(' ').toLowerCase();
   return text.includes(search);
 }
 export function escapeHtml(value) {return String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}

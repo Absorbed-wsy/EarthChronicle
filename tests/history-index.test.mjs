@@ -123,6 +123,21 @@ test('empty searches skip text construction after geographic and time filters pa
   assert.equal(eventMatches(record,filter({year:2025}),placeMap),false);
 });
 
+test('county events are searchable by county, former name, province and prefecture while keeping the selected year and location', () => {
+  const countyPlaces=[
+    {id:'county-a',name:'测试县',parentCity:'示例市',regionName:'甲省',regionCode:'CN-TEST-A',countryCode:'CN',adminLevel:'county',aliases:['旧县名']},
+    {id:'county-b',name:'测试县',parentCity:'另一市',regionName:'乙省',regionCode:'CN-TEST-B',countryCode:'CN',adminLevel:'county'},
+  ];
+  const events=[event('current','county-a',2020),event('past','county-a',2019),event('namesake','county-b',2020)];
+  const matches=criteria=>events.filter(record=>eventMatches(record,filter({year:2020,...criteria}),countyPlaces)).map(record=>record.id);
+  assert.deepEqual(matches({query:'示例市'}),['current']);
+  assert.deepEqual(matches({query:'旧县名'}),['current']);
+  assert.deepEqual(matches({query:'甲省'}),['current']);
+  assert.deepEqual(matches({query:'测试县',city:'county-a'}),['current']);
+  assert.deepEqual(matches({query:'示例市',scope:'all'}),['current','past']);
+  assert.deepEqual(matches({query:'示例市',region:'CN-TEST-B'}),[]);
+});
+
 test('multi-year events appear only in their inclusive active years, including the BCE/CE boundary', () => {
   const spanning = event('span','nanjing',2000,'社会','持续事件',{endYear:2002});
   for(const year of [1999,2000,2001,2002,2003]) {

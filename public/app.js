@@ -17,7 +17,7 @@ async function api(url,options={}){const response=await fetch(url,{...options,he
 let indexedPlaces,placesById;
 function placeIndex(){if(indexedPlaces!==state.places){indexedPlaces=state.places;placesById=new Map(state.places.map(place=>[place.id,place]));}return placesById;}
 const placeOf=event=>placeIndex().get(event?.placeId);
-const historySort=(a,b)=>b.year-a.year||a.title.localeCompare(b.title,'zh-CN')||a.id.localeCompare(b.id);
+const historySort=(a,b)=>b.year-a.year||(b.date||'').localeCompare(a.date||'')||a.title.localeCompare(b.title,'zh-CN')||a.id.localeCompare(b.id);
 const matchingEvents=(scope=state.scope)=>state.events.filter(e=>eventMatches(e,{...state,scope},placeIndex())).sort(historySort);
 const filtered=()=>matchingEvents();
 const countryPlaces=()=>placesInCountry(state.places,state.countryCode);
@@ -70,12 +70,25 @@ function renderList(){
   const pages=Math.ceil(events.length/EVENT_PAGE_SIZE);state.page=Math.max(0,Math.min(state.page,pages-1));const offset=state.page*EVENT_PAGE_SIZE;
   $('event-list').innerHTML=events.slice(offset,offset+EVENT_PAGE_SIZE).map(e=>`<button class="event-card ${e.id===state.selected?'active':''}" data-event="${h(e.id)}"><div class="event-meta"><time>${yearTickLabel(e.year)}</time><span>${h(e.category)}</span>${e.userCreated?'<span class="user-badge">自定义</span>':''}</div><h3>${h(e.title)}</h3><div class="event-place"><span class="place-dot"></span>${h(placeOf(e)?.name)}${activeEra(e)?'<span>·</span>'+h(activeEra(e).replace('明 · ','')):''}</div></button>`).join('')+(pages>1?`<nav class="list-pagination" aria-label="事件列表分页"><button data-page="${state.page-1}" ${state.page===0?'disabled':''}>上一页</button><span>${state.page+1} / ${pages}</span><button data-page="${state.page+1}" ${state.page>=pages-1?'disabled':''}>下一页</button></nav>`:'');
 }
+function eventSources(event){
+  const references=[{title:event.sourceTitle,url:event.sourceUrl},...(Array.isArray(event.sources)?event.sources:[])];
+  return [...new Map(references.filter(source=>source&&safeSourceUrl(source.url)).map(source=>[safeSourceUrl(source.url),{title:source.title||'原始资料',url:safeSourceUrl(source.url)}])).values()];
+}
+function sourceLinks(event){
+  const sources=eventSources(event);
+  return sources.length?sources.map(source=>`<a class="source-link" href="${h(source.url)}" target="_blank" rel="noopener noreferrer">${h(source.title)} ↗</a>`).join(''):`<span class="source-link">${h(event.sourceTitle||'未提供来源')}</span>`;
+}
+function eventDate(event){
+  if(!/^\d{4}-\d{2}(?:-\d{2})?$/.test(event.date||''))return '';
+  const [year,month,day]=event.date.split('-').map(Number);
+  return `${year}年${month}月${day?day+'日':''}`;
+}
 function renderDetail(){
   const e=state.events.find(e=>e.id===state.selected);
   if(!e){$('detail').innerHTML='<div class="detail-empty"><span class="eyebrow">EVENT DETAILS</span><h2>事件详情</h2><p>选择事件查看详情。</p></div>';return;}
   const p=placeOf(e),samePlace=state.events.filter(x=>x.placeId===e.placeId&&x.id!==e.id).sort((a,b)=>Math.abs(a.year-e.year)-Math.abs(b.year-e.year)).slice(0,3).sort((a,b)=>a.year-b.year);
-  const sourceUrl=safeSourceUrl(e.sourceUrl);const seq=state.events.filter(x=>!x.userCreated).sort((a,b)=>a.year-b.year).findIndex(x=>x.id===e.id)+1;
-  $('detail').innerHTML=`<div class="detail-eyeline"><span class="detail-sequence">${e.userCreated?'自定义':String(seq).padStart(2,'0')+' / CHRONICLE'}</span><span class="category-tag">${h(e.category)}</span></div><div class="detail-year">${e.year<=0?'前 '+(1-e.year):e.year}</div><div class="detail-era">${h(activeEra(e))}${e.endYear!=null&&e.endYear!==e.year?' · 至 '+h(yearLabel(e.endYear)):''}</div><h2>${h(e.title)}</h2>${e.userCreated&&canEdit()?'<div class="event-actions"><button class="quiet-button" id="edit-event">编辑</button><button class="quiet-button delete-button" id="delete-event">删除</button></div>':''}<p class="detail-summary">${h(e.summary)}</p><div class="place-panel"><div class="place-panel-top"><div><h3>${h(p?.name)} <span class="optional">${h(p?.historicalName||'')}</span></h3><p class="coordinate">${Math.abs(p?.lat||0).toFixed(2)}° ${p?.lat>=0?'N':'S'} &nbsp; ${Math.abs(p?.lon||0).toFixed(2)}° ${p?.lon>=0?'E':'W'}</p></div><button id="fly-place">定位 ↗</button></div><p>${h(p?.description||'')}</p></div><div class="source-block"><span class="section-label">资料来源</span>${sourceUrl?`<a class="source-link" href="${h(sourceUrl)}" target="_blank" rel="noopener noreferrer">${h(e.sourceTitle||'原始资料')} ↗</a>`:`<span class="source-link">${h(e.sourceTitle||'未提供来源')}</span>`}<p class="precision-note">按年展示${e.userCreated?' · 用户记录，未经过史料核验':' · 内置史料，只读'}<br>${h(e.locationNote||(p?.isCustom?'用户标记位置。':'坐标为现代城市的示意定位，并非事件发生地的精确遗址坐标。'))}</p></div><div class="related-section"><span class="section-label">相关事件</span>${samePlace.length?samePlace.map(x=>`<button class="related-item" data-related="${h(x.id)}"><time>${yearTickLabel(x.year)}</time><span>${h(x.title)}</span></button>`).join(''):'<p class="precision-note">暂无相关记录。</p>'}</div>`;
+  const seq=state.events.filter(x=>!x.userCreated).sort((a,b)=>a.year-b.year).findIndex(x=>x.id===e.id)+1;
+  $('detail').innerHTML=`<div class="detail-eyeline"><span class="detail-sequence">${e.userCreated?'自定义':String(seq).padStart(2,'0')+' / CHRONICLE'}</span><span class="category-tag">${h(e.category)}</span></div><div class="detail-year">${e.year<=0?'前 '+(1-e.year):e.year}</div><div class="detail-era">${h(eventDate(e)||activeEra(e))}${e.endYear!=null&&e.endYear!==e.year?' · 至 '+h(yearLabel(e.endYear)):''}</div><h2>${h(e.title)}</h2>${e.userCreated&&canEdit()?'<div class="event-actions"><button class="quiet-button" id="edit-event">编辑</button><button class="quiet-button delete-button" id="delete-event">删除</button></div>':''}<p class="detail-summary">${h(e.summary)}</p><div class="place-panel"><div class="place-panel-top"><div><h3>${h(p?.name)} <span class="optional">${h(e.placeHistoricalName||'')}</span></h3><p class="coordinate">${Math.abs(p?.lat||0).toFixed(2)}° ${p?.lat>=0?'N':'S'} &nbsp; ${Math.abs(p?.lon||0).toFixed(2)}° ${p?.lon>=0?'E':'W'}</p></div><button id="fly-place">定位 ↗</button></div><p>${h(p?.description||'')}</p></div><div class="source-block"><span class="section-label">资料来源</span>${sourceLinks(e)}<p class="precision-note">按年展示${e.userCreated?' · 用户记录，未经过史料核验':' · 内置史料，只读'}<br>${h(e.locationNote||(p?.isCustom?'用户标记位置。':'坐标为现代城市的示意定位，并非事件发生地的精确遗址坐标。'))}</p></div><div class="related-section"><span class="section-label">相关事件</span>${samePlace.length?samePlace.map(x=>`<button class="related-item" data-related="${h(x.id)}"><time>${yearTickLabel(x.year)}</time><span>${h(x.title)}</span></button>`).join(''):'<p class="precision-note">暂无相关记录。</p>'}</div>`;
 }
 function updateMarkers(){
   if(!mapView)return;
@@ -185,7 +198,7 @@ async function deleteEvent(event){
     $('confirm-delete-event').textContent='删除';
   }
 }
-function showSources(){const sources=[...new Map(state.events.filter(e=>!e.userCreated&&safeSourceUrl(e.sourceUrl)).map(e=>[e.sourceUrl,{title:e.sourceTitle,url:e.sourceUrl}])).values()];$('sources-content').innerHTML=`<p>地球史书 v${h(state.session.version || '0.1.0')}</p><h3>历史资料</h3><p>本版收录 ${state.events.filter(e=>!e.userCreated).length} 条明初示例事件，提供摘要与出处。年份之外的月日未在时间轴中展开；无事件的年份表示尚未收录。</p><p>城市坐标用于阅读导航，不能当作古代遗址的精确定位。地图为现代道路与地形，不代表事件发生时的道路或疆域。</p><div class="source-list">${sources.map(s=>`<a href="${h(s.url)}" target="_blank" rel="noopener noreferrer">${h(s.title)} ↗</a>`).join('')}</div><h3>显示与数据</h3><p>地图使用 MapLibre、OpenFreeMap / OpenStreetMap 道路数据和 Mapzen 高程数据；附带 Natural Earth 全球基础地图。详细道路及地形按视野联网加载。中文译名和当地名称以数据源提供的内容为准。</p>`;$('sources-dialog').showModal();}
+function showSources(){const sources=[...new Map(state.events.filter(e=>!e.userCreated).flatMap(eventSources).map(source=>[source.url,source])).values()];$('sources-content').innerHTML=`<p>地球史书 v${h(state.session.version || '0.1.6')}</p><h3>历史资料</h3><p>本版收录 ${state.events.filter(e=>!e.userCreated).length} 条历史事件，提供摘要与出处。时间轴按年浏览，已核实的月日见事件详情。未收录事件的年份不代表没有历史事件。</p><p>城市坐标用于阅读导航，不能当作古代遗址的精确定位。地图为现代道路与地形，不代表事件发生时的道路或疆域。</p><div class="source-list">${sources.map(s=>`<a href="${h(s.url)}" target="_blank" rel="noopener noreferrer">${h(s.title)} ↗</a>`).join('')}</div><h3>显示与数据</h3><p>地图使用 MapLibre、OpenFreeMap / OpenStreetMap 道路数据和 Mapzen 高程数据；附带 Natural Earth 全球基础地图。详细道路及地形按视野联网加载。中文译名和当地名称以数据源提供的内容为准。</p>`;$('sources-dialog').showModal();}
 function bind(){
   const changed=()=>{stopPlayback();state.page=0;renderHistory();};
   $('scope').onchange=e=>{state.scope=e.target.value;changed();};$('category').onchange=e=>{state.category=e.target.value;changed();};

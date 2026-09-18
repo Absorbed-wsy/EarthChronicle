@@ -4,13 +4,15 @@
 
 世界历史默认选择中国，从本机当前年份向过去追溯，支持按国家、地区、城市、时期、年份、类型与关键词检索。地图仅标记所选年份发生或仍在持续的事件。本地软件可在地图上选点创建个人事件，并编辑、删除和迁移个人记录；网页端只读。
 
+当前源码内置 634 条事件、241 个地点：包括 24 条明初资料及 1949—2026 年的 610 条中华人民共和国时期事件，提供已核实日期、摘要、来源与地点说明。资料涵盖全国大事、社会生活和地方发展；县域与场址记录涉及 31 个省级地区，支持县名、旧称和所属地级市检索。义乌、金寨、平遥等地可按年份连续浏览不同时期事件，另收录城乡供水、基层教育、县乡通信、农村电气化、工人社区、人口流动、三明医改、闽宁移民安置和玉树灾后重建等地方发展过程。现代部分逐年收录重大事件，最新收录节点为 2026 年 3 月 12 日，尚非完整通史。
+
 桌面程序使用 .NET Framework / WinForms 和 WebView2，地图使用 MapLibre GL JS，本地服务使用 Node.js，资料保存在 SQLite 数据库中。
 
 软件附带全球基础地图，详细道路与地点按视野从 OpenFreeMap 加载矢量数据，真实地形使用 Mapzen Terrain Tiles。在线细节需要联网，无需服务密钥，也无需下载地区地图包。城市和地区在数据提供中文名称时显示中文与当地名称对照，点击城市名称可自动放大。地图以分级加载和有限缓存控制资源使用，数据来源和精度限制见使用说明。
 
 ## 下载运行
 
-在 [v0.1 Release](https://github.com/Absorbed-wsy/EarthChronicle/releases/tag/v0.1) 下载 `EarthChronicle-v0.1-windows-x64.zip`，解压到可写目录，双击其中的 **EarthChronicle.exe**。发行包已包含 Node.js、地图、字形及程序组件，无需构建或安装 Node.js；请保留完整文件夹。
+在 [v0.1.6 Release](https://github.com/Absorbed-wsy/EarthChronicle/releases/tag/v0.1.6) 下载 `EarthChronicle-v0.1.6-windows-x64.zip`，解压到可写目录，双击其中的 **EarthChronicle.exe**。发行包已包含 Node.js、地图、字形及程序组件，无需构建或安装 Node.js；请保留完整文件夹。
 
 支持 Windows 10/11 x64，需要 .NET Framework 4.8 与 [Microsoft WebView2 Evergreen Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/)。缺少 WebView2 时安装官方运行时后重试。不要直接在压缩包中启动。首次运行自动建立数据库并导入内置资料，内容服务器默认关闭。
 
@@ -37,7 +39,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File desktop/build.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File desktop/package.ps1
 ```
 
-打包脚本重新编译 EXE，校验必要资源并生成 `dist/EarthChronicle-v0.1-windows-x64.zip` 和校验文件。包中不包含个人数据库、日志、浏览器缓存或开发工具。已完成构建时可用 `-SkipBuild`。
+打包脚本重新编译 EXE，校验必要资源并按 `package.json` 版本号生成便携 ZIP（当前为 `dist/EarthChronicle-v0.1.6-windows-x64.zip`）和校验文件。包中不包含个人数据库、日志、浏览器缓存或开发工具。已完成构建时可用 `-SkipBuild`。
 
 窗口、地图、个人记录、网页访问及数据库备份的操作方法见 [使用说明](docs/使用说明.md)。
 
@@ -47,20 +49,21 @@ powershell -NoProfile -ExecutionPolicy Bypass -File desktop/package.ps1
 
 | 资源 | 随源码提供的内容 |
 | --- | --- |
-| `public/data/history.json` | 5 个地点、24 条中国明初历史事件及来源 |
+| `public/data/history.json` | 明初与中华人民共和国时期的事件、地点、已核实日期及来源 |
+| `public/data/catalog.json` | 内置资料版本与校验值，用于更新旧数据库并核验兼容备份 |
 | `public/maps/*.geojson` | 全球基础陆地、国家边界、国家名称及 1,251 个主要城市 |
 | `public/maps/liberty.json`、`sprite*` | 地图样式及普通、高清图标图集 |
 | `public/maps/fonts/noto-sans/` | 地图预制字形，约 33 MiB，含 47,586 个字形及文件校验清单 |
 | `desktop/assets/`、`public/favicon.*` | 桌面程序与网页图标 |
 | `licenses/`、`runtime/LICENSE.txt` | 随附资料与组件的许可声明 |
 
-首次启动会自动创建 `data/chronicle.sqlite` 并导入基础历史资料。当前年份没有资料时，列表和地图事件标记为空，可选择“明”或有记录的年份浏览。其他国家的历史事件尚未收录，国家列表不代表资料覆盖范围。
+首次启动会自动创建 `data/chronicle.sqlite` 并导入基础历史资料。可选择“中华人民共和国”或“明”，再按年份、城市和类型浏览；选择“全部年份”可阅读所选时期的列表，地图仍只显示当前年份事件。当前年份没有资料时，列表和地图事件标记为空。资料聚焦中国历史，包含部分发生于境外的中国相关事件；国家列表不代表各国通史均已收录。
 
 基础地图及样式共约 1.2 MiB，另附约 33 MiB 地图字形，构建完成后可离线显示。字形从本地读取，无需联网下载字体；本地字形文件读取失败时使用系统字体。在线道路、街区和高程按需从网络加载；这些详细数据不随仓库分发，也不需要预先下载。
 
 内置资料、个人事件、显示设置和内容服务器配置统一保存在该数据库中。内置资料只读，个人事件可在本地软件中编辑；网页端只读。本机数据库、备份、日志及浏览器缓存不提交到仓库。更新软件时保留原 `data` 文件夹，个人记录会保留。
 
-兼容的旧数据库会自动迁移，保留个人记录与设置。通过本地设置导出、导入数据库，可迁移个人事件及其地图坐标；具体合并规则见使用说明。
+已核验的兼容旧数据库会自动补充新版内置资料，保留个人记录、显示设置与内容服务器配置。资料升级在同一事务内完成，校验不匹配时不会覆盖数据库。导入旧版备份时只合并个人内容与恢复显示设置，不会把内置资料退回旧版；具体规则见使用说明。
 
 ## 测试
 

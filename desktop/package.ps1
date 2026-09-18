@@ -93,7 +93,7 @@ $rootFiles = @('EarthChronicle.exe', 'EarthChronicle.exe.config', 'Microsoft.Web
 $runtimeFiles = @('runtime\node.exe', 'runtime\LICENSE.txt')
 $requiredAssets = @(
   'public\index.html', 'public\app.js', 'public\style.css', 'public\domain.js', 'public\map-view.js', 'public\map-style.js',
-  'public\data\history.json', 'public\maps\liberty.json', 'public\maps\land.geojson', 'public\maps\countries.geojson', 'public\maps\country-labels.geojson', 'public\maps\places.geojson',
+  'public\data\history.json', 'public\data\catalog.json', 'public\maps\liberty.json', 'public\maps\land.geojson', 'public\maps\countries.geojson', 'public\maps\country-labels.geojson', 'public\maps\places.geojson',
   'public\maps\sprite.json', 'public\maps\sprite.png', 'public\maps\sprite@2x.json', 'public\maps\sprite@2x.png', 'public\maps\fonts\noto-sans\manifest.json',
   'public\vendor\maplibre\maplibre-gl.mjs', 'public\vendor\maplibre\maplibre-gl-shared.mjs', 'public\vendor\maplibre\maplibre-gl-worker.mjs', 'public\vendor\maplibre\maplibre-gl.css', 'public\vendor\maplibre\LICENSE.txt',
   'licenses\WebView2\LICENSE.txt', 'licenses\WebView2\NOTICE.txt', 'licenses\maps\OpenFreeMap-LICENSE.md', 'licenses\maps\OSM-Liberty-LICENSE.md', 'licenses\maps\Maki-LICENSE.txt',

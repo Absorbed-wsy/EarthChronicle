@@ -10,13 +10,14 @@ import path from 'node:path';
 import {createChronicleServer} from '../server.mjs';
 import {SCHEMA_VERSION} from '../database.mjs';
 import {eraForYear,eventMatches,safeSourceUrl,escapeHtml,yearLabel} from '../public/domain.js';
+const bundled=JSON.parse(await readFile(new URL('../public/data/history.json',import.meta.url),'utf8'));
 
 test('year mapping, interval filtering and source escaping',()=>{
   assert.equal(eraForYear(1368),'明 · 洪武元年');assert.equal(eraForYear(1398),'明 · 洪武三十一年');assert.equal(eraForYear(1399),'明 · 建文元年');assert.equal(eraForYear(1405),'明 · 永乐三年');assert.equal(yearLabel(0),'公元前 1 年');
   const event={year:1374,endYear:1378,placeId:'x',title:'工程',category:'营建',summary:''},query={year:1377,scope:'year',city:'all',category:'all',query:''};assert.ok(eventMatches(event,query,[]));assert.ok(!eventMatches(event,{...query,year:1379},[]));assert.ok(!eventMatches(event,{...query,city:'y'},[]));assert.equal(safeSourceUrl('javascript:alert(1)'),null);assert.equal(escapeHtml('<img>'),'&lt;img&gt;');
 });
 test('bundled historical content has valid linked data',async()=>{
-  const data=JSON.parse(await readFile(new URL('../public/data/history.json',import.meta.url),'utf8'));assert.equal(data.events.length,24);assert.equal(new Set(data.events.map(e=>e.id)).size,24);for(const event of data.events){assert.ok(data.places.some(p=>p.id===event.placeId));assert.ok(safeSourceUrl(event.sourceUrl));assert.ok(event.precision==='year');}
+  assert.equal(bundled.events.filter(e=>e.id.startsWith('ming-')).length,24);assert.equal(new Set(bundled.events.map(e=>e.id)).size,bundled.events.length);for(const event of bundled.events){assert.ok(bundled.places.some(p=>p.id===event.placeId));assert.ok(safeSourceUrl(event.sourceUrl));assert.ok(['year','month','day'].includes(event.precision));}
 });
 const example={title:'个人测试记录',year:1405,placeId:'nanjing',category:'文化',summary:'自动验证',sourceTitle:'测试',sourceUrl:'https://example.com/'};
 async function host(databasePath,publicDir){const desktopKey=randomBytes(32).toString('hex'),app=await createChronicleServer({databasePath,publicDir,desktopKey,contentHost:'127.0.0.1'});const port=await app.listen(0),base='http://127.0.0.1:'+port,session=await fetch(base+'/api/session',{headers:{'X-Desktop-Key':desktopKey}}).then(r=>r.json());return {app,base,session,desktopKey,request:(route,method='GET',body,headers={})=>fetch(base+route,{method,headers:{'X-Desktop-Key':desktopKey,'X-Edit-Token':session.token,'Content-Type':'application/json',...headers},...(body===undefined?{}:{body:Buffer.isBuffer(body)?body:JSON.stringify(body)})})};}
@@ -29,7 +30,7 @@ test('legacy data migration, one database, immutable sources and personal editin
   db.exec('CREATE TABLE user_events (id TEXT PRIMARY KEY, payload TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)');db.prepare('INSERT INTO user_events VALUES(?,?,?,?)').run(legacy.id,JSON.stringify(legacy),now,now);db.close();
   running=await host(file);const {request}=running;
   assert.equal(running.session.interface,'local');assert.equal(running.session.appId,'earth-chronicle');
-  let library=await request('/api/library').then(r=>r.json());assert.equal(library.events.length,25);assert.ok(library.events.some(e=>e.id==='user-legacy'));
+  let library=await request('/api/library').then(r=>r.json());assert.equal(library.events.length,bundled.events.length+1);assert.ok(library.events.some(e=>e.id==='user-legacy'));
   assert.equal((await request('/api/events','POST',example,{'X-Edit-Token':'bad'})).status,403);
   assert.equal((await request('/api/events','POST',example,{Origin:'http://evil.example'})).status,403);
   assert.equal((await request('/api/events','POST',{...example,sourceUrl:'javascript:alert(1)'})).status,400);
@@ -64,7 +65,7 @@ test('whole SQLite database export/import preserves personal changes and rejects
   assert.equal((await target.request('/api/library').then(r=>r.json())).events.find(e=>e.id===first.id).title,'目标机较新修改');
   backupDB=new DatabaseSync(file);backupDB.prepare("UPDATE canonical_records SET payload='{}' WHERE kind='history-event' AND id=(SELECT id FROM canonical_records WHERE kind='history-event' LIMIT 1)").run();backupDB.close();
   assert.equal((await importDB(await readFile(file))).status,400);assert.equal((await importDB(Buffer.from('not a database'))).status,400);
-  const library=await target.request('/api/library').then(r=>r.json());assert.ok(library.events.some(e=>e.id===retained.id));assert.equal(library.events.filter(e=>!e.userCreated).length,24);
+  const library=await target.request('/api/library').then(r=>r.json());assert.ok(library.events.some(e=>e.id===retained.id));assert.equal(library.events.filter(e=>!e.userCreated).length,bundled.events.length);
   assert.equal((await target.request('/api/settings').then(r=>r.json())).contentServer.enabled,false);
  }finally{await source?.app.close();await target?.app.close();await clean(dir);}
 });
@@ -72,11 +73,11 @@ test('content server is optional, web is read-only even on localhost, port colli
  const dir=await mkdtemp(path.join(tmpdir(),'earthchronicle-test-'));let local,blocker;
  try{
   local=await host(path.join(dir,'local.sqlite'));assert.equal((await local.request('/api/settings').then(r=>r.json())).contentServer.enabled,false);
-  const ordinarySession=await fetch(local.base+'/api/session').then(r=>r.json());assert.equal(ordinarySession.interface,'web');assert.equal(ordinarySession.canEdit,false);assert.equal(ordinarySession.token,null);assert.equal(ordinarySession.version,'0.1.0');
+  const ordinarySession=await fetch(local.base+'/api/session').then(r=>r.json());assert.equal(ordinarySession.interface,'web');assert.equal(ordinarySession.canEdit,false);assert.equal(ordinarySession.token,null);assert.equal(ordinarySession.version,'0.1.6');
   assert.equal((await fetch(local.base+'/api/library')).status,403);assert.equal((await fetch(local.base+'/api/geology/manifest')).status,404);assert.equal((await fetch(local.base+'/api/geology/66')).status,404);
   for(const wrongKey of ['', 'bad', 'f'.repeat(64)]){const session=await fetch(local.base+'/api/session',{headers:{'X-Desktop-Key':wrongKey}}).then(r=>r.json());assert.equal(session.canEdit,false);assert.equal(session.token,null);}
-  for(const file of ['/','/app.js','/style.css','/maps/liberty.json']){const response=await fetch(local.base+file);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('x-earth-chronicle-version'),'0.1.0');await response.arrayBuffer();}
-  const health=await fetch(local.base+'/api/health').then(r=>r.json());assert.deepEqual(health,{appId:'earth-chronicle',version:'0.1.0'});
+  for(const file of ['/','/app.js','/style.css','/maps/liberty.json']){const response=await fetch(local.base+file);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(response.headers.get('x-earth-chronicle-version'),'0.1.6');await response.arrayBuffer();}
+  const health=await fetch(local.base+'/api/health').then(r=>r.json());assert.deepEqual(health,{appId:'earth-chronicle',version:'0.1.6'});
   // Old browser tabs may retain the previous edit token. It must be useless
   // without the native application's key, even from this same computer.
   const adminRoutes=[['/api/settings','GET'],['/api/preferences','GET'],['/api/preferences','PUT','{}'],['/api/database/export','GET'],['/api/database/import','POST','x'],['/api/content-server','PUT','{}'],['/api/events','POST',JSON.stringify(example)],['/api/events/user-fake','PUT',JSON.stringify(example)],['/api/events/user-fake','DELETE'],['/api/shutdown','POST','{}']];
