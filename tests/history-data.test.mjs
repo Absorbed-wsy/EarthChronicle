@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {CATEGORIES,eventMatches} from '../public/domain.js';
+import {eventMatchesPeriod} from '../public/history-navigation.js';
 
 const data=JSON.parse(await readFile(new URL('../public/data/history.json',import.meta.url),'utf8'));
 const prc=data.events.filter(event=>event.id.startsWith('prc-'));
@@ -45,12 +46,27 @@ test('published catalogue hashes cover the complete shipped corpus and recognize
   assert.ok(catalog.previous.includes('1ccd9f27e3bdc0ec9495299d97ebbd89862041c026dcf30c77419bd92ee3602c'));
   assert.ok(catalog.previous.includes('664df38f32679d800e608a0ca48f9a4afb876525c9c2e9acc37b45cb8a42bafc'));
   assert.ok(catalog.previous.includes('d2913cd04254221347954a7c79cfad5af95c728acc5784df2882b32a1029b056'));
+  assert.ok(catalog.previous.includes('ef969fc86106235dc6dc377c57159dea05cfbfe61ca161f43e937a914ce488c7'));
+  assert.ok(catalog.previous.includes('b8452c6a1ab7735974ebc934e87151f5827f75107f1c1242659e65f7bf48f4b0'));
+  assert.ok(catalog.previous.includes('60ec7007097c44d8831175bf067ad385341f917f5d373ff5e14419e6db790003'));
+  assert.ok(catalog.previous.includes('3d6fb5033b3391733c81aa79e44b852f93a0b62237f73c399bf7d2f42485b2f3'));
+  assert.ok(catalog.previous.includes('5c1654f9511519a4da2f13b92c4af0f51af5aa84dfe0b5d61e7bb86f2198a7d7'));
+});
+
+test('period collection counts and boundary labels agree with the exact-date navigation',()=>{
+  for(const collection of data.meta.collections){
+    const records=data.events.filter(event=>eventMatchesPeriod(event,collection.id));
+    assert.equal(records.length,collection.events,collection.id);
+  }
+  for(const event of data.events.filter(event=>event.year===1949)){
+    assert.equal(event.era,event.date<'1949-10-01'?'中华民国':'中华人民共和国',event.id);
+  }
 });
 
 test('county records have coherent geographic metadata and remain discoverable by their parent city',()=>{
   const places=new Map(data.places.map(place=>[place.id,place]));
   const countyPlaces=data.places.filter(place=>['county','site'].includes(place.adminLevel));
-  const countyEvents=prc.filter(event=>['county','site'].includes(places.get(event.placeId)?.adminLevel));
+  const countyEvents=data.events.filter(event=>['county','site'].includes(places.get(event.placeId)?.adminLevel));
   assert.ok(countyPlaces.length>0);assert.ok(countyEvents.length>0);
   assert.equal(data.meta.countyCoverage.places,countyPlaces.length);
   assert.equal(data.meta.countyCoverage.events,countyEvents.length);

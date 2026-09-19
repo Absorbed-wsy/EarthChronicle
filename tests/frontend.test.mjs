@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {CATEGORIES,eraForYear,yearLabel,eventMatches,eventIsActive,escapeHtml,safeSourceUrl} from '../public/domain.js';
-import {HISTORY_PERIODS,periodsForCountry,periodBounds,periodsForYear,yearTickLabel} from '../public/history-navigation.js';
+import {HISTORY_PERIODS,periodsForCountry,periodBounds,periodsForYear,periodForEvent,eventMatchesPeriod,yearTickLabel} from '../public/history-navigation.js';
 import {EVENT_PAGE_SIZE,eventYearGroups,timelineStops} from '../public/history-index.js';
 import {countryOptions,countryName,placesInCountry} from '../public/geography.js';
 
@@ -41,7 +41,7 @@ function environment() {
     requestAnimationFrame:()=>++frame,cancelAnimationFrame(){},matchMedia:window.matchMedia,
     localStorage:{getItem:()=>null,setItem(){}},fetch:()=>{throw new Error('Unexpected fetch');},
     CATEGORIES,eraForYear,yearLabel,eventMatches,eventIsActive,h:escapeHtml,safeSourceUrl,
-    HISTORY_PERIODS,periodsForCountry,periodBounds,periodsForYear,yearTickLabel,EVENT_PAGE_SIZE,eventYearGroups,timelineStops,
+    HISTORY_PERIODS,periodsForCountry,periodBounds,periodsForYear,periodForEvent,eventMatchesPeriod,yearTickLabel,EVENT_PAGE_SIZE,eventYearGroups,timelineStops,
     countryOptions,countryName,placesInCountry});
   return {context,get,elements};
 }
@@ -68,6 +68,40 @@ const countryFeatures={type:'FeatureCollection',features:[
   {type:'Feature',properties:{country_code:'JP','name:zh':'日本'},geometry:{type:'Point',coordinates:[138,37]}},
 ]};
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
+
+test('transition-year controls keep list, counts, map and labels in one exact period',()=>{
+  const {ui,get}=app(),markers=[];
+  const earlier={...event('before',1949,'建国筹备'),date:'1949-09-30',era:'中华人民共和国'};
+  const later={...event('after',1949,'成立典礼'),date:'1949-10-01',placeId:'beijing'};
+  const uncertain={...event('uncertain',1949,'年份记录'),userCreated:true};
+  Object.assign(ui.state,{places,events:[earlier,later,uncertain],year:1949,countryCode:'CN'});
+  ui.injectMapView({isFlat:()=>false,setHistoryPlaces:(visible,options)=>markers.push({visible,options})});ui.bind();
+  for(const [period,id,placeId,label] of [['republic','before','nanjing','中华民国'],['prc','after','beijing','中华人民共和国']]){
+    get('period-filter').onchange({target:{value:period}});
+    assert.deepEqual(ui.filtered().map(e=>e.id),[id]);assert.equal(ui.state.selected,id);
+    assert.equal(get('event-count').textContent,'1 条事件');assert.match(get('year-filter').innerHTML,/1949 年 · 1 条/);
+    assert.deepEqual(markers.at(-1).visible.map(p=>p.id),[placeId]);assert.equal(markers.at(-1).options.counts[placeId],1);
+    assert.equal(get('era-label').textContent,label);assert.match(get('event-list').innerHTML,new RegExp(label));
+    if(period==='republic')assert.doesNotMatch(get('event-list').innerHTML,/中华人民共和国/);
+  }
+  get('period-filter').onchange({target:{value:'all'}});
+  assert.equal(ui.filtered().length,3);assert.doesNotMatch(get('era-label').textContent,/中华民国.*中华人民共和国|中华人民共和国.*中华民国/);
+});
+
+test('same-year related and personal event navigation clears an incompatible period and retains the target',()=>{
+  const {ui,get}=app();
+  const earlier={...event('before',1949,'共同纲领'),date:'1949-09-29',era:'中华民国'};
+  const later={...event('after',1949,'开国大典'),date:'1949-10-01',era:'中华人民共和国'};
+  const personal={...event('personal',1949,'个人年份记录'),userCreated:true};
+  Object.assign(ui.state,{places,events:[earlier,later,personal],year:1949,countryCode:'CN'});ui.bind();
+  for(const target of [earlier,personal]){
+    get('period-filter').onchange({target:{value:'prc'}});assert.equal(ui.state.selected,'after');
+    ui.selectEvent(target.id);assert.equal(ui.state.period,'all');assert.equal(ui.state.selected,target.id);
+    assert.ok(ui.filtered().some(e=>e.id===target.id));assert.match(get('detail').innerHTML,new RegExp(target.title));
+  }
+  get('period-filter').onchange({target:{value:'republic'}});ui.selectEvent('after');
+  assert.equal(ui.state.period,'all');assert.equal(ui.state.selected,'after');
+});
 
 function deletionApp() {
   const env=app(),{get,context}=env,dialog=get('delete-event-dialog');

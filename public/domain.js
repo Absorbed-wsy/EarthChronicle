@@ -1,3 +1,4 @@
+import {eventMatchesPeriod} from './history-navigation.js';
 export const CATEGORIES = ['政治','军事','外交','经济','社会','科技','文化','灾害','建都','营建','制度','航海','战争'];
 export function chineseNumber(n) {
   const digits = '零一二三四五六七八九';
@@ -15,7 +16,7 @@ export function eraForYear(year) {
 }
 export function yearLabel(year) {return year <= 0 ? `公元前 ${1-year} 年` : `${year} 年`;}
 export function eventIsActive(event,year) {return event.year<=year && (event.endYear??event.year)>=year;}
-export function eventMatches(event, {year,scope='year',city='all',category='all',query='',countryCode,region='all',min,max}, places) {
+export function eventMatches(event, {year,scope='year',city='all',category='all',query='',countryCode,region='all',period='all',min,max}, places) {
   const place=places instanceof Map?places.get(event.placeId):places.find(p=>p.id===event.placeId);
   const cityId=place?.isCustom===true?place.cityId:event.placeId;
   if(city !== 'all' && cityId !== city) return false;
@@ -24,6 +25,7 @@ export function eventMatches(event, {year,scope='year',city='all',category='all'
   }else if(category !== 'all' && event.category !== category) return false;
   if(countryCode && countryCode!=='all' && place?.countryCode!==countryCode) return false;
   if(region!=='all' && place?.regionCode!==region) return false;
+  if(!eventMatchesPeriod(event,period,countryCode))return false;
   if(Number.isFinite(min) && (event.endYear??event.year)<min) return false;
   if(Number.isFinite(max) && event.year>max) return false;
   const span=scope==='nearby'?5:0;

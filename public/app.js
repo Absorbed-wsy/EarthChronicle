@@ -3,7 +3,7 @@ import {initSettings} from './settings.js';
 import {initMapView} from './map-view.js';
 import * as maplibregl from './vendor/maplibre/maplibre-gl.mjs';
 import {CATEGORIES,eraForYear,yearLabel,eventMatches,eventIsActive,escapeHtml as h,safeSourceUrl} from './domain.js';
-import {periodsForCountry,periodBounds,periodsForYear,yearTickLabel} from './history-navigation.js';
+import {periodsForCountry,periodBounds,periodsForYear,periodForEvent,eventMatchesPeriod,yearTickLabel} from './history-navigation.js';
 import {EVENT_PAGE_SIZE,eventYearGroups,timelineStops} from './history-index.js';
 import {countryOptions,countryName,placesInCountry} from './geography.js';
 import {initCountryPicker} from './country-picker.js';
@@ -33,8 +33,20 @@ function updateBounds(){
 }
 function yearGroups(){return eventYearGroups(matchingEvents('all'),state.min,state.max);}
 const eventRange=e=>e.endYear!=null&&e.endYear!==e.year?`${yearLabel(e.year)}—${yearLabel(e.endYear)}`:yearLabel(e.year);
-function yearEra(year,countryCode=state.countryCode){if(countryCode!=='CN')return '';const era=eraForYear(year);return era.includes(' · ')?era:periodsForYear(year,currentYear(),countryCode).map(p=>p.name).join(' / ')||era;}
-function activeEra(e){return e.era||yearEra(e.year,placeOf(e)?.countryCode??'');}
+function yearEra(year,countryCode=state.countryCode){
+  if(countryCode!=='CN')return '';
+  const periods=periodsForYear(year,currentYear(),countryCode),selected=periods.find(p=>p.id===state.period);
+  const period=selected||(periods.length===1?periods[0]:null);
+  if(!period)return '';
+  const era=eraForYear(year);return era.startsWith(period.name+' · ')?era:period.name;
+}
+function activeEra(e){
+  const country=placeOf(e)?.countryCode??'';
+  if(country!=='CN')return e.era||'';
+  const period=periodForEvent(e,country);if(!period)return '';
+  if(e.era===period.name||e.era?.startsWith(period.name+' · '))return e.era;
+  const era=eraForYear(e.year);return era.startsWith(period.name+' · ')?era:period.name;
+}
 function stopPlayback(){clearInterval(playTimer);playTimer=null;$('play').textContent='▶';$('play').setAttribute('aria-label','播放时间轴');}
 function syncYearInputs(){ $('year-era').value=state.year<=0?'bce':'ce';$('year-input').value=state.year<=0?1-state.year:state.year; }
 function syncControls(){
@@ -103,7 +115,7 @@ function setYear(value,{select=true,refresh=false}={}){
   if(year===state.year&&!refresh){syncYearInputs();$('time-slider').value=year;return;}
   state.year=year;state.page=0;if(select)state.selected=filtered().find(e=>eventIsActive(e,state.year))?.id||null;renderHistory();
 }
-function selectEvent(id,{fly=false}={}){const event=state.events.find(e=>e.id===id);if(!event)return;stopPlayback();state.selected=id;state.year=event.year;const place=placeOf(event);if(state.countryCode!=='all'&&state.countryCode!==place?.countryCode){state.countryCode=place?.countryCode||'all';state.period='all';updateBounds();}if(state.region!=='all'&&state.region!==place?.regionCode)state.region='all';if(state.city!=='all'&&state.city!==cityIdOf(place))state.city='all';if(event.year<state.min||event.year>state.max){state.period='all';updateBounds();}if(state.category!=='all'&&state.category!==event.category&&!(state.category==='custom'&&event.userCreated))state.category='all';if(!eventMatches(event,state,placeIndex())){state.query='';$('search').value='';}state.page=Math.max(0,Math.floor(filtered().findIndex(e=>e.id===id)/EVENT_PAGE_SIZE));renderHistory();if(fly)flyPlace(place);}
+function selectEvent(id,{fly=false}={}){const event=state.events.find(e=>e.id===id);if(!event)return;stopPlayback();state.selected=id;state.year=event.year;const place=placeOf(event);if(state.countryCode!=='all'&&state.countryCode!==place?.countryCode){state.countryCode=place?.countryCode||'all';state.period='all';updateBounds();}if(state.region!=='all'&&state.region!==place?.regionCode)state.region='all';if(state.city!=='all'&&state.city!==cityIdOf(place))state.city='all';if(event.year<state.min||event.year>state.max||!eventMatchesPeriod(event,state.period,state.countryCode)){state.period='all';updateBounds();}if(state.category!=='all'&&state.category!==event.category&&!(state.category==='custom'&&event.userCreated))state.category='all';if(!eventMatches(event,state,placeIndex())){state.query='';$('search').value='';}state.page=Math.max(0,Math.floor(filtered().findIndex(e=>e.id===id)/EVENT_PAGE_SIZE));renderHistory();if(fly)flyPlace(place);}
 function flyPlace(place){if(place)mapView?.flyPlace(place,{zoom:11});}
 function focusCountry(){
   if(!mapView)return;
@@ -198,7 +210,7 @@ async function deleteEvent(event){
     $('confirm-delete-event').textContent='删除';
   }
 }
-function showSources(){const sources=[...new Map(state.events.filter(e=>!e.userCreated).flatMap(eventSources).map(source=>[source.url,source])).values()];$('sources-content').innerHTML=`<p>地球史书 v${h(state.session.version || '0.1.6')}</p><h3>历史资料</h3><p>本版收录 ${state.events.filter(e=>!e.userCreated).length} 条历史事件，提供摘要与出处。时间轴按年浏览，已核实的月日见事件详情。未收录事件的年份不代表没有历史事件。</p><p>城市坐标用于阅读导航，不能当作古代遗址的精确定位。地图为现代道路与地形，不代表事件发生时的道路或疆域。</p><div class="source-list">${sources.map(s=>`<a href="${h(s.url)}" target="_blank" rel="noopener noreferrer">${h(s.title)} ↗</a>`).join('')}</div><h3>显示与数据</h3><p>地图使用 MapLibre、OpenFreeMap / OpenStreetMap 道路数据和 Mapzen 高程数据；附带 Natural Earth 全球基础地图。详细道路及地形按视野联网加载。中文译名和当地名称以数据源提供的内容为准。</p>`;$('sources-dialog').showModal();}
+function showSources(){const sources=[...new Map(state.events.filter(e=>!e.userCreated).flatMap(eventSources).map(source=>[source.url,source])).values()];$('sources-content').innerHTML=`<p>地球史书 v${h(state.session.version || '0.1.11')}</p><h3>历史资料</h3><p>本版收录 ${state.events.filter(e=>!e.userCreated).length} 条历史事件，提供摘要与出处。时间轴按年浏览，已核实的月日见事件详情。未收录事件的年份不代表没有历史事件。</p><p>城市坐标用于阅读导航，不能当作古代遗址的精确定位。地图为现代道路与地形，不代表事件发生时的道路或疆域。</p><div class="source-list">${sources.map(s=>`<a href="${h(s.url)}" target="_blank" rel="noopener noreferrer">${h(s.title)} ↗</a>`).join('')}</div><h3>显示与数据</h3><p>地图使用 MapLibre、OpenFreeMap / OpenStreetMap 道路数据和 Mapzen 高程数据；附带 Natural Earth 全球基础地图。详细道路及地形按视野联网加载。中文译名和当地名称以数据源提供的内容为准。</p>`;$('sources-dialog').showModal();}
 function bind(){
   const changed=()=>{stopPlayback();state.page=0;renderHistory();};
   $('scope').onchange=e=>{state.scope=e.target.value;changed();};$('category').onchange=e=>{state.category=e.target.value;changed();};

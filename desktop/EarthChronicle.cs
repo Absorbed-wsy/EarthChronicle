@@ -18,8 +18,8 @@ using Microsoft.Web.WebView2.WinForms;
 
 [assembly: System.Reflection.AssemblyTitle("地球史书")]
 [assembly: System.Reflection.AssemblyProduct("EarthChronicle")]
-[assembly: System.Reflection.AssemblyVersion("0.1.6.0")]
-[assembly: System.Reflection.AssemblyFileVersion("0.1.6.0")]
+[assembly: System.Reflection.AssemblyVersion("0.1.11.0")]
+[assembly: System.Reflection.AssemblyFileVersion("0.1.11.0")]
 
 namespace EarthChronicle {
  internal static class NativeTransport {
@@ -275,7 +275,7 @@ namespace EarthChronicle {
   private void WriteState(string state){
    try{
     int backendId=0;try{if(backend!=null)backendId=backend.Id;}catch(InvalidOperationException){}
-    File.WriteAllText(Path.Combine(Program.Root,"data","desktop-state.json"),Program.Json.Serialize(new {pid=Process.GetCurrentProcess().Id,backendPid=backendId,browserPid=browserPid,port=port,state=state,windowState=WindowState.ToString().ToLowerInvariant(),windowVisible=Visible,showInTaskbar=ShowInTaskbar,taskbarEligible=Visible&&ShowInTaskbar,trayVisible=tray.Visible,hiddenToTray=hiddenToTray,trayHideQueued=trayHideQueued,closeRequestCount=closeRequestCount,trayHideCount=trayHideCount,hostHandle=IsHandleCreated?lastHostHandle:0,webViewHandle=view!=null&&view.IsHandleCreated?lastWebViewHandle:0,hostHandleCreatedCount=hostHandleCreatedCount,hostHandleDestroyedCount=hostHandleDestroyedCount,webViewHandleCreatedCount=webViewHandleCreatedCount,webViewHandleDestroyedCount=webViewHandleDestroyedCount,ready=ready,backendLost=backendLost,restoreState=restoreState.ToString().ToLowerInvariant(),updatedAt=DateTime.UtcNow.ToString("o"),version="0.1.6"}),Encoding.UTF8);
+    File.WriteAllText(Path.Combine(Program.Root,"data","desktop-state.json"),Program.Json.Serialize(new {pid=Process.GetCurrentProcess().Id,backendPid=backendId,browserPid=browserPid,port=port,state=state,windowState=WindowState.ToString().ToLowerInvariant(),windowVisible=Visible,showInTaskbar=ShowInTaskbar,taskbarEligible=Visible&&ShowInTaskbar,trayVisible=tray.Visible,hiddenToTray=hiddenToTray,trayHideQueued=trayHideQueued,closeRequestCount=closeRequestCount,trayHideCount=trayHideCount,hostHandle=IsHandleCreated?lastHostHandle:0,webViewHandle=view!=null&&view.IsHandleCreated?lastWebViewHandle:0,hostHandleCreatedCount=hostHandleCreatedCount,hostHandleDestroyedCount=hostHandleDestroyedCount,webViewHandleCreatedCount=webViewHandleCreatedCount,webViewHandleDestroyedCount=webViewHandleDestroyedCount,ready=ready,backendLost=backendLost,restoreState=restoreState.ToString().ToLowerInvariant(),updatedAt=DateTime.UtcNow.ToString("o"),version="0.1.11"}),Encoding.UTF8);
    }catch{}
   }
   private async Task ExitApplication() {
