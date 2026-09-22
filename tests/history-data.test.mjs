@@ -51,6 +51,9 @@ test('published catalogue hashes cover the complete shipped corpus and recognize
   assert.ok(catalog.previous.includes('60ec7007097c44d8831175bf067ad385341f917f5d373ff5e14419e6db790003'));
   assert.ok(catalog.previous.includes('3d6fb5033b3391733c81aa79e44b852f93a0b62237f73c399bf7d2f42485b2f3'));
   assert.ok(catalog.previous.includes('5c1654f9511519a4da2f13b92c4af0f51af5aa84dfe0b5d61e7bb86f2198a7d7'));
+  assert.ok(catalog.previous.includes('b321fd52004f11c739e17ce3d036c34aaf917533bd7a5e3f2dafb5922d4eff8e'));
+  assert.ok(catalog.previous.includes('ad0052be3e0f6ca80573e94fda0d289d7e4a41ca1e3341a8c8f40a2273948a6d'));
+  assert.ok(catalog.previous.includes('dd0ba9a8865fb9cb4c52c1e90b13d5eef2bbf0c1da34f87a7fad72443e8cf750'));
 });
 
 test('period collection counts and boundary labels agree with the exact-date navigation',()=>{

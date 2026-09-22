@@ -9,18 +9,18 @@ const data=JSON.parse(await readFile(new URL('../public/data/history.json',impor
 const places=new Map(data.places.map(p=>[p.id,p]));
 const qing=data.events.filter(e=>e.id.startsWith('qing-'));
 
-test('late Qing records retain verified date precision and independent event sources',()=>{
+test('Qing records retain verified date precision and independent event sources',()=>{
   assert.ok(qing.length>=60);
   const sources=new Set();
   for(const e of qing){
     assert.equal(e.era,'清',e.id);assert.ok(places.has(e.placeId),e.id);
     assert.ok(e.title&&e.summary.length>=70&&e.locationNote,e.id);assert.ok(CATEGORIES.includes(e.category),e.id);
-    assert.ok(Number.isInteger(e.year)&&e.year>=1840&&e.year<=1911,e.id);
+    assert.ok(Number.isInteger(e.year)&&e.year>=1636&&e.year<=1911,e.id);
     if(e.date){
       assert.match(e.date,/^\d{4}-\d{2}(?:-\d{2})?$/,e.id);assert.equal(Number(e.date.slice(0,4)),e.year,e.id);
       const full=e.date.length===7?e.date+'-01':e.date;
       assert.equal(new Date(full).toISOString().slice(0,10),full,e.id);
-      assert.ok(full>='1840-01-01'&&full<'1912-01-01',e.id);
+      assert.ok(full>='1636-01-01'&&full<'1912-01-01',e.id);
       assert.equal(e.precision,e.date.length===7?'month':'day',e.id);
     }else assert.equal(e.precision,'year',e.id);
     if(e.endYear!=null)assert.ok(Number.isInteger(e.endYear)&&e.endYear>=e.year&&e.endYear<=1911,e.id);
@@ -28,13 +28,13 @@ test('late Qing records retain verified date precision and independent event sou
     for(const s of [{title:e.sourceTitle,url:e.sourceUrl},...e.sources]){
       assert.ok(s.title,e.id);const u=new URL(s.url);assert.ok(['http:','https:'].includes(u.protocol)&&!u.username&&!u.password,e.id);sources.add(u.href);
     }
-    assert.equal(eventMatchesPeriod(e,'qing'),true,e.id);assert.equal(eventMatchesPeriod(e,'modern'),true,e.id);
+    assert.equal(eventMatchesPeriod(e,'qing'),true,e.id);assert.equal(eventMatchesPeriod(e,'modern'),e.year>=1840,e.id);
     assert.equal(eventMatchesPeriod(e,'republic'),false,e.id);assert.equal(eventMatchesPeriod(e,'prc'),false,e.id);
   }
   assert.ok(sources.size>=50);
   for(const c of ['政治','军事','外交','战争','制度','经济','科技','文化','灾害'])assert.ok(qing.some(e=>e.category===c),c);
-  const years=eventYearGroups(qing,1840,1911).map(g=>g.year);
-  for(const y of [1840,1842,1851,1860,1866,1872,1881,1895,1900,1905,1911])assert.ok(years.includes(y),String(y));
+  const years=eventYearGroups(qing,1636,1911).map(g=>g.year);
+  for(const y of [1636,1644,1683,1689,1729,1757,1796,1839,1840,1842,1851,1860,1866,1872,1881,1895,1900,1905,1911])assert.ok(years.includes(y),String(y));
 });
 
 test('the 1911 election and 1912 abdication follow the establishment-day boundary without duplication',()=>{
