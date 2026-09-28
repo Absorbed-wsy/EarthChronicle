@@ -468,8 +468,8 @@ test('countries without records clear stale details, years and map markers',()=>
     places,countryFeatures,scope:'year',year:1405,selected:'cn'});
   ui.injectMapView({isFlat:()=>false,setHistoryPlaces:visible=>markers.push(visible),flyPlace(){}});
   ui.bind();ui.renderHistory();assert.match(get('detail').innerHTML,/1405/);
-  get('country-filter').onchange({target:{value:'JP'}});
-  assert.equal(ui.state.countryCode,'JP');assert.equal(ui.state.year,1405);assert.equal(ui.state.selected,null);
+  get('country-filter').onchange({target:{value:'US'}});
+  assert.equal(ui.state.countryCode,'US');assert.equal(ui.state.year,1405);assert.equal(ui.state.selected,null);
   assert.equal(ui.filtered().length,0);assert.match(get('event-list').innerHTML,/暂无匹配记录/);
   assert.match(get('detail').innerHTML,/选择事件查看详情。/);
   assert.equal(markers.at(-1).length,0);assert.equal(get('event-dots').innerHTML,'');
@@ -709,3 +709,61 @@ for (const successful of [true,false]) {
     assert.match(get('database-status').textContent,successful?/导入完成/:/导入失败/);
   });
 }
+
+test('Japan switches to its own period controls while list, years and map remain in the selected scope',()=>{
+  const {ui,get}=app(),markers=[];
+  const japanesePlace={id:'tokyo',name:'东京',countryCode:'JP',regionCode:'JP-13',regionName:'东京都',lon:139.69,lat:35.69};
+  const records=[{...event('jp-before',2019,'平成末年事件'),date:'2019-04-30',placeId:'tokyo',periodId:'jp-heisei',era:'平成'},
+    {...event('jp-after',2019,'令和事件'),date:'2019-05-01',placeId:'tokyo',periodId:'jp-reiwa',era:'令和'},
+    {...event('jp-past',2018,'过去事件'),placeId:'tokyo',periodId:'jp-heisei',era:'平成'},event('cn',2019)];
+  Object.assign(ui.state,{places:[...places,japanesePlace],events:records,countryFeatures,countryCode:'CN',period:'prc',scope:'all',year:2019});
+  ui.injectMapView({isFlat:()=>false,setHistoryPlaces:(visible,options)=>markers.push({visible,options}),flyPlace(){}});
+  ui.bind();get('country-filter').onchange({target:{value:'JP'}});
+  assert.equal(ui.state.period,'all');assert.equal(ui.filtered().length,3);
+  assert.equal(get('period-filter').disabled,false);
+  assert.match(get('period-filter').innerHTML,/value="jp-heisei"/);assert.match(get('period-filter').innerHTML,/value="jp-reiwa"/);
+  assert.doesNotMatch(get('period-filter').innerHTML,/value="prc"|value="ming"/);
+  for(const [period,ids,label,count] of [['jp-heisei',['jp-before','jp-past'],'平成',1],['jp-reiwa',['jp-after'],'令和',1]]){
+    get('period-filter').onchange({target:{value:period}});
+    assert.deepEqual(ui.filtered().map(e=>e.id),ids);assert.equal(get('era-label').textContent,label);
+    assert.deepEqual(markers.at(-1).visible.map(p=>p.id),['tokyo']);assert.equal(markers.at(-1).options.counts.tokyo,count);
+    assert.match(get('year-filter').innerHTML,/2019 年 · 1 条/);
+  }
+  ui.selectEvent('jp-before');assert.equal(ui.state.period,'all');assert.equal(ui.state.selected,'jp-before');
+  get('country-filter').onchange({target:{value:'CN'}});
+  assert.equal(ui.state.period,'all');assert.match(get('period-filter').innerHTML,/value="prc"/);
+  assert.doesNotMatch(get('period-filter').innerHTML,/value="jp-/);assert.deepEqual(ui.filtered().map(e=>e.id),['cn']);
+});
+
+test('Korea has independent period controls and same-year liberation-government boundaries',()=>{
+  const {ui,get}=app(),markers=[];
+  const koreanPlace={id:'seoul',name:'首尔',countryCode:'KR',regionCode:'KR-11',regionName:'首尔',lon:126.978,lat:37.5665};
+  const records=[{...event('kr-constitution',1948,'宪法公布'),date:'1948-07-17',placeId:'seoul',periodId:'kr-liberation',era:'解放与分治'},
+    {...event('kr-government',1948,'政府成立'),date:'1948-08-15',placeId:'seoul',periodId:'kr-republic',era:'大韩民国'},
+    {...event('kr-past',1947,'此前事件'),placeId:'seoul',periodId:'kr-liberation',era:'解放与分治'},event('cn',1948)];
+  Object.assign(ui.state,{places:[...places,koreanPlace],events:records,countryFeatures,countryCode:'CN',period:'republic',scope:'all',year:1948});
+  ui.injectMapView({isFlat:()=>false,setHistoryPlaces:(visible,options)=>markers.push({visible,options}),flyPlace(){}});
+  ui.bind();get('country-filter').onchange({target:{value:'KR'}});
+  assert.equal(ui.state.period,'all');assert.equal(ui.filtered().length,3);assert.equal(get('period-filter').disabled,false);
+  assert.match(get('period-filter').innerHTML,/value="kr-goryeo"/);assert.match(get('period-filter').innerHTML,/value="kr-republic"/);
+  assert.doesNotMatch(get('period-filter').innerHTML,/value="prc"|value="jp-/);
+  for(const [period,ids,label]of [['kr-liberation',['kr-constitution','kr-past'],'解放与分治'],['kr-republic',['kr-government'],'大韩民国']]){
+    get('period-filter').onchange({target:{value:period}});assert.deepEqual(ui.filtered().map(e=>e.id),ids);assert.equal(get('era-label').textContent,label);
+    assert.deepEqual(markers.at(-1).visible.map(p=>p.id),['seoul']);assert.equal(markers.at(-1).options.counts.seoul,1);assert.match(get('year-filter').innerHTML,/1948 年 · 1 条/);
+  }
+  ui.selectEvent('kr-constitution');assert.equal(ui.state.period,'all');assert.equal(ui.state.selected,'kr-constitution');
+  get('country-filter').onchange({target:{value:'CN'}});assert.deepEqual(ui.filtered().map(e=>e.id),['cn']);assert.doesNotMatch(get('period-filter').innerHTML,/value="kr-/);
+});
+
+test('prehistoric catalogue years remain enterable while era-specific bounds reject unsupported input',()=>{
+ const {ui,get}=app(),markerUpdates=[];
+ const location={id:'vn-hoa-binh',name:'和平',countryCode:'VN',regionCode:'VN-GEO-PHT',regionName:'富寿省',lon:105.3,lat:20.8};
+ const first={...event('prehistoric',-15999),placeId:location.id,periodId:'vn-early'};
+ Object.assign(ui.state,{places:[location],events:[first],meta:{coverage:[-15999,2026]},countryCode:'VN',period:'vn-ly',year:1010,min:1009,max:1225,scope:'year'});
+ ui.injectMapView({isFlat:()=>false,setHistoryPlaces:visible=>markerUpdates.push(visible)});ui.bind();ui.renderHistory();
+ get('year-era').value='bce';get('year-input').value='16000';get('year-input').onchange();
+ assert.equal(ui.state.year,-15999);assert.equal(ui.state.period,'all');assert.equal(ui.state.selected,'prehistoric');assert.equal(Number(get('year-input').max),16000);assert.equal(markerUpdates.at(-1)[0]?.id,location.id);
+ get('year-input').value='16001';get('year-input').onchange();assert.equal(ui.state.year,-15999);assert.equal(get('year-input').value,16000);
+ get('year-era').value='ce';get('year-input').value='16000';get('year-era').onchange();assert.equal(ui.state.year,-15999);assert.equal(get('year-era').value,'bce');
+ get('year-era').value='ce';get('year-input').value='2026';get('year-input').onchange();assert.equal(ui.state.year,2026);assert.equal(Number(get('year-input').max),9999);
+});

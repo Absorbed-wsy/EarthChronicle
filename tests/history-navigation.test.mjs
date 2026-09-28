@@ -16,7 +16,7 @@ test('foreign and worldwide scopes never use Chinese dynasty or contemporary per
   assert.equal(periodsForCountry(), HISTORY_PERIODS);
   assert.equal(periodsForCountry('CN'), HISTORY_PERIODS);
   assert.equal(periodsForCountry('CN')[0].name, '全部');
-  for (const countryCode of ['all', 'FR', 'US', 'JP']) {
+  for (const countryCode of ['all', 'FR', 'US']) {
     const periods = periodsForCountry(countryCode);
     assert.deepEqual(periods.map(({ id, name }) => ({ id, name })), [{ id: 'all', name: '全部' }]);
     assert.equal(Object.isFrozen(periods), true);

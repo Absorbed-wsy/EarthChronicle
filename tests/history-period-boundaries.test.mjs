@@ -126,7 +126,7 @@ test('lists, year groups and annual map filters share the same period membership
 
 test('the shipped 1949 corpus partitions at October 1 without duplicate period membership',async()=>{
   const history=JSON.parse(await readFile(new URL('../public/data/history.json',import.meta.url),'utf8'));
-  const records=history.events.filter(event=>event.year===1949);
+  const records=history.events.filter(event=>event.year===1949&&periodForEvent(event,'CN')!==null);
   const ids=period=>records.filter(event=>eventMatchesPeriod(event,period)).map(event=>event.id).sort();
   const republic=ids('republic'),prc=ids('prc');
   for(const id of ['prc-1949-common-programme','prc-1949-cppcc-first-session','prc-1949-national-flag'])assert.ok(republic.includes(id),id);

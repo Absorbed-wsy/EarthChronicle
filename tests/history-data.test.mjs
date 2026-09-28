@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {CATEGORIES,eventMatches} from '../public/domain.js';
-import {eventMatchesPeriod} from '../public/history-navigation.js';
+import {periodForEvent,eventMatchesPeriod} from '../public/history-navigation.js';
 
 const data=JSON.parse(await readFile(new URL('../public/data/history.json',import.meta.url),'utf8'));
 const prc=data.events.filter(event=>event.id.startsWith('prc-'));
@@ -58,10 +58,10 @@ test('published catalogue hashes cover the complete shipped corpus and recognize
 
 test('period collection counts and boundary labels agree with the exact-date navigation',()=>{
   for(const collection of data.meta.collections){
-    const records=data.events.filter(event=>eventMatchesPeriod(event,collection.id));
+    const records=data.events.filter(event=>eventMatchesPeriod(event,collection.id,collection.countryCode));
     assert.equal(records.length,collection.events,collection.id);
   }
-  for(const event of data.events.filter(event=>event.year===1949)){
+  for(const event of data.events.filter(event=>event.year===1949&&periodForEvent(event,'CN')!==null)){
     assert.equal(event.era,event.date<'1949-10-01'?'中华民国':'中华人民共和国',event.id);
   }
 });

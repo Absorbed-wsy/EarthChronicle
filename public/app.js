@@ -34,11 +34,10 @@ function updateBounds(){
 function yearGroups(){return eventYearGroups(matchingEvents('all'),state.min,state.max);}
 const eventRange=e=>e.endYear!=null&&e.endYear!==e.year?`${yearLabel(e.year)}—${yearLabel(e.endYear)}`:yearLabel(e.year);
 function yearEra(year,countryCode=state.countryCode){
-  if(countryCode!=='CN')return '';
   const periods=periodsForYear(year,currentYear(),countryCode),selected=periods.find(p=>p.id===state.period);
   const period=selected||(periods.length===1?periods[0]:null);
   if(!period)return '';
-  const era=eraForYear(year);return era.startsWith(period.name+' · ')?era:period.name;
+  const era=countryCode==='CN'?eraForYear(year):'';return era.startsWith(period.name+' · ')?era:period.name;
 }
 function activeEra(e){
   const country=placeOf(e)?.countryCode??'';
@@ -48,12 +47,13 @@ function activeEra(e){
   const era=eraForYear(e.year);return era.startsWith(period.name+' · ')?era:period.name;
 }
 function stopPlayback(){clearInterval(playTimer);playTimer=null;$('play').textContent='▶';$('play').setAttribute('aria-label','播放时间轴');}
-function syncYearInputs(){ $('year-era').value=state.year<=0?'bce':'ce';$('year-input').value=state.year<=0?1-state.year:state.year; }
+function yearInputLimit(era=$('year-era').value){const bounds=state.meta?.coverage??[];const extent=era==='bce'?(Number.isSafeInteger(bounds[0])?1-bounds[0]:0):(Number.isSafeInteger(bounds[1])?bounds[1]:0);return Math.max(9999,extent);}
+function syncYearInputs(){ $('year-era').value=state.year<=0?'bce':'ce';$('year-input').value=state.year<=0?1-state.year:state.year;$('year-input').max=yearInputLimit(); }
 function syncControls(){
   $('add-button').hidden=!canEdit();
     $('chapter-kicker').textContent='WORLD · HISTORY';$('chapter-title').textContent='世界历史';
     $('coverage').textContent=`已收录 ${state.events.filter(e=>state.countryCode==='all'||placeOf(e)?.countryCode===state.countryCode).length} 条事件`;$('list-label').textContent=`${regionTitle()} · ${state.scope==='all'?'全部年份':state.scope==='nearby'?'前后五年':yearLabel(state.year)}`;
-    $('time-unit').textContent='年份';$('era-label').textContent=yearEra(state.year);syncYearInputs();$('year-input').min=1;$('year-input').max=9999;
+    $('time-unit').textContent='年份';$('era-label').textContent=yearEra(state.year);syncYearInputs();$('year-input').min=1;
     $('time-slider').min=state.min;$('time-slider').max=state.max;$('time-slider').value=state.year;$('time-slider').setAttribute('aria-label','浏览年份');$('time-slider').setAttribute('aria-valuetext',yearLabel(state.year));
     $('jump-start').textContent='起点';$('jump-end').textContent='终点';$('previous-year').setAttribute('aria-label','前一年');$('next-year').setAttribute('aria-label','后一年');
     $('time-ticks').innerHTML=Array.from({length:5},(_,i)=>`<span>${yearTickLabel(Math.round(state.min+(state.max-state.min)*i/4))}</span>`).join('');
@@ -225,7 +225,7 @@ function bind(){
   $('delete-event-form').onsubmit=deleteEvent;
   $('delete-event-dialog').addEventListener('cancel',e=>{if(e.currentTarget.dataset.busy==='true')e.preventDefault();});
   $('delete-event-dialog').addEventListener('close',()=>{delete $('delete-event-dialog').dataset.eventId;});
-  const enteredYear=()=>{const n=Number($('year-input').value);if(!Number.isInteger(n)||n<1||n>9999){syncYearInputs();return;}stopPlayback();const year=$('year-era').value==='bce'?1-n:n;if(year<state.min||year>state.max){state.period='all';updateBounds();}setYear(year);};
+  const enteredYear=()=>{const n=Number($('year-input').value);if(!Number.isSafeInteger(n)||n<1||n>yearInputLimit()){syncYearInputs();return;}stopPlayback();const year=$('year-era').value==='bce'?1-n:n;if(year<state.min||year>state.max){state.period='all';updateBounds();}setYear(year);};
   $('year-input').onchange=enteredYear;$('year-input').onkeydown=e=>{if(e.key==='Enter')enteredYear();};$('year-era').onchange=enteredYear;$('time-slider').oninput=e=>{stopPlayback();setYear(e.target.value);};$('event-dots').onclick=e=>{const b=e.target.closest('[data-year]');if(b){stopPlayback();setYear(b.dataset.year);}};
   $('previous-year').onclick=()=>{stopPlayback();step(-1);};$('next-year').onclick=()=>{stopPlayback();step(1);};$('jump-start').onclick=()=>{stopPlayback();setYear(state.min);};$('jump-end').onclick=()=>{stopPlayback();setYear(state.max);};
   $('previous-node').onclick=()=>{const target=yearGroups().find(g=>g.year<state.year);if(target){stopPlayback();setYear(target.year);}};

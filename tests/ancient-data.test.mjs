@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {CATEGORIES,eventMatches,yearLabel} from '../public/domain.js';
-import {HISTORY_PERIODS,eventMatchesPeriod,yearTickLabel} from '../public/history-navigation.js';
+import {HISTORY_PERIODS,periodForEvent,eventMatchesPeriod,yearTickLabel} from '../public/history-navigation.js';
 const data=JSON.parse(await readFile(new URL('../public/data/history.json',import.meta.url),'utf8'));
 const places=new Map(data.places.map(p=>[p.id,p]));
-const ancient=data.events.filter(e=>e.year<1368||e.periodId==='ming');
+const ancient=data.events.filter(e=>periodForEvent(e,'CN')!==null&&(e.year<1368||e.periodId==='ming'));
 test('ancient corpus covers every selectable pre-Qing period with valid geography and traceable sources',()=>{
  for(const p of HISTORY_PERIODS.filter(p=>!p.navigationOnly&&p.start<1636))assert.ok(ancient.some(e=>eventMatchesPeriod(e,p.id)),p.id);
  for(const e of ancient){
