@@ -9,7 +9,7 @@ const ancient=data.events.filter(e=>periodForEvent(e,'CN')!==null&&(e.year<1368|
 test('ancient corpus covers every selectable pre-Qing period with valid geography and traceable sources',()=>{
  for(const p of HISTORY_PERIODS.filter(p=>!p.navigationOnly&&p.start<1636))assert.ok(ancient.some(e=>eventMatchesPeriod(e,p.id)),p.id);
  for(const e of ancient){
-  assert.ok(Number.isInteger(e.year)&&e.year>=-769,e.id);assert.ok(places.has(e.placeId),e.id);
+  assert.ok(Number.isInteger(e.year)&&e.year>=-17999,e.id);assert.ok(places.has(e.placeId),e.id);
   assert.ok(e.title&&e.summary.length>=60&&e.locationNote,e.id);assert.ok(CATEGORIES.includes(e.category),e.id);
   assert.ok(e.sourceTitle&&/^https?:$/.test(new URL(e.sourceUrl).protocol),e.id);
   assert.equal(e.precision,'year',e.id);assert.equal(e.date,null,e.id);
@@ -17,14 +17,16 @@ test('ancient corpus covers every selectable pre-Qing period with valid geograph
   assert.equal(owners.length,1,e.id);assert.equal(owners[0].id,e.periodId,e.id);
  }
 });
-test('ancient annual, geographic and dynasty filters do not leak adjacent-year or concurrent-regime events',()=>{
+test('ancient annual, geographic and dynasty filters respect verified spans and exclude unrelated years or regimes',()=>{
  for(const e of ancient){
   const local=places.get(e.placeId).countryCode==='CN';
   const f={countryCode:local?'CN':'all',city:e.placeId,period:local?e.periodId:'all',scope:'year',year:e.year};
   assert.equal(eventMatches(e,f,places),true,e.id);
   if(!local){assert.equal(eventMatches(e,{...f,countryCode:'CN'},places),false,e.id);assert.equal(eventMatches(e,{...f,countryCode:places.get(e.placeId).countryCode},places),true,e.id);}
   assert.equal(eventMatches(e,{...f,year:e.year-1},places),false,e.id);
-  assert.equal(eventMatches(e,{...f,year:e.year+1},places),false,e.id);
+  const finalYear=e.endYear??e.year;assert.ok(finalYear>=e.year,e.id);
+  for(const year of new Set([finalYear,Math.trunc((e.year+finalYear)/2)]))assert.equal(eventMatches(e,{...f,year},places),true,e.id);
+  assert.equal(eventMatches(e,{...f,year:finalYear+1},places),false,e.id);
   assert.equal(eventMatches(e,{...f,city:'not-the-same-city'},places),false,e.id);
  }
  for(const id of ['qin-bce221-unification','three-kingdoms-220-wei','two-jin-280-wu-fall','sui-589-chen-fall','tang-618-foundation','five-dynasties-907-liang','song-1279-yashan','ming-1644-beijing-fall']){

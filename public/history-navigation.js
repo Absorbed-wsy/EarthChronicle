@@ -21,8 +21,10 @@ const sources = {
   founding: 'https://www.mod.gov.cn/gfbw/qwfb/4851535.html',
 };
 
-// Earlier Xia/Shang/Western Zhou dates are intentionally not given exact-year
-// presets. The first navigation period begins with the Eastern Zhou migration.
+// Prehistoric bounds index selected archaeological records, not the origin of
+// human settlement. Xia/Shang and Western Zhou bounds follow conventional
+// museum chronology; before 841 BCE, event details preserve approximate dates.
+// Archaeological cultures can overlap; explicit ownership prevents duplication.
 // "Western Han" follows the Met's 206 BCE convention (Liu Bang as King of Han),
 // rather than 202 BCE (emperor). Qin's 206 BCE end follows the National Museum.
 // Qing starts with the 1636 dynastic name and ends with the 1912 abdication,
@@ -33,7 +35,7 @@ const sources = {
 // conversion; year-only metadata must not fabricate a January 1 transition.
 // Broad period labels (e.g. Tang) do not imply uninterrupted dynastic rule.
 export const HISTORY_PERIODS = Object.freeze([
-  { id: 'all', name: '全部', start: -769, end: null, navigationOnly: true, sourceURL: sources.preQin },
+  { id: 'all', name: '全部', start: -17999, end: null, navigationOnly: true, sourceURL: sources.preQin },
   { id: 'modern', name: '近现代', start: 1840, end: null, navigationOnly: true, sourceURL: sources.modern },
   { id: 'prc', name: '中华人民共和国', start: 1949, end: null, startDate: '1949-10-01', sourceURL: sources.founding },
   { id: 'republic', name: '中华民国', start: 1912, end: 1949, startDate: '1912-01-01', endBefore: '1949-10-01', sourceURL: sources.republic, endSourceURL: sources.founding },
@@ -55,6 +57,9 @@ export const HISTORY_PERIODS = Object.freeze([
   { id: 'western-han', name: '西汉', start: -205, end: 9, sourceURL: sources.han },
   { id: 'qin', name: '秦', start: -220, end: -205, sourceURL: sources.qinHan },
   { id: 'spring-autumn-warring', name: '春秋战国', start: -769, end: -220, sourceURL: sources.preQin },
+  { id: 'western-zhou', name: '西周', start: -1045, end: -770, sourceURL: 'https://www.chnmus.net/ch/exhibitions/permanent/huaxia/index.html' },
+  { id: 'xia-shang', name: '夏商', start: -2069, end: -1046, sourceURL: 'https://www.chnmus.net/ch/exhibitions/permanent/huaxia/index.html' },
+  { id: 'cn-prehistory', name: '史前与早期', start: -17999, end: -1899, sourceURL: 'https://www.chnmuseum.cn/portals/0/web/zt/gudai/en/detail1.html' },
 ].map(period => Object.freeze(period)));
 
 // Japanese chronology is independent of Chinese dynasty navigation. Ancient
@@ -592,7 +597,22 @@ export const MYANMAR_PERIODS = Object.freeze([
   }
 ].map(period=>Object.freeze(period)));
 
-export const INDIA_PERIODS = Object.freeze([{"id":"all","name":"全部","start":-19999,"end":null,"navigationOnly":true,"sourceURL":"https://whc.unesco.org/document/154601"},{"id":"in-republic","name":"印度共和国","start":1950,"end":null,"startDate":"1950-01-26","sourceURL":"https://www.legislative.gov.in/static/uploads/2025/07/359f70a69695affb9d72f8393102bd2e.pdf"},{"id":"in-dominion","name":"印度自治领","start":1947,"end":1950,"startDate":"1947-08-15","endBefore":"1950-01-26","sourceURL":"https://www.legislation.gov.uk/ukpga/Geo6/10-11/30","endSourceURL":"https://www.legislative.gov.in/static/uploads/2025/07/359f70a69695affb9d72f8393102bd2e.pdf"},{"id":"in-british","name":"英属印度","start":1858,"end":1947,"startDate":"1858-09-02","endBefore":"1947-08-15","sourceURL":"https://www.legislation.gov.uk/ukpga/Vict/21-22/106/pdfs/ukpga_18580106_en.pdf","endSourceURL":"https://www.legislation.gov.uk/ukpga/Geo6/10-11/30"},{"id":"in-company","name":"殖民据点与公司统治","start":1498,"end":1858,"endBefore":"1858-09-02","sourceURL":"https://www.metmuseum.org/toah/ht/08/ssa.html","endSourceURL":"https://www.legislation.gov.uk/ukpga/Vict/21-22/106/pdfs/ukpga_18580106_en.pdf"},{"id":"in-regional","name":"区域王国与马拉塔","start":1400,"end":1858,"sourceURL":"https://www.metmuseum.org/toah/ht/08/ssa.html"},{"id":"in-mughal","name":"莫卧儿","start":1526,"end":1858,"sourceURL":"https://www.metmuseum.org/toah/ht/08/ssa.html"},{"id":"in-sur","name":"苏尔王朝","start":1540,"end":1555,"sourceURL":"https://www.metmuseum.org/toah/ht/08/ssa.html"},{"id":"in-sultanate","name":"德里苏丹国与北部诸国","start":1206,"end":1526,"sourceURL":"https://www.metmuseum.org/toah/ht/07/ssn.html"},{"id":"in-northeast","name":"东北与喜马拉雅诸国","start":600,"end":1947,"sourceURL":"https://whc.unesco.org/en/list/1711/"},{"id":"in-south","name":"南部王国与德干","start":500,"end":1800,"sourceURL":"https://www.metmuseum.org/toah/ht/06/sss.html"},{"id":"in-early-medieval","name":"中古早期诸国","start":500,"end":1205,"sourceURL":"https://www.metmuseum.org/toah/ht/06/ssn.html"},{"id":"in-gupta","name":"笈多时期","start":320,"end":550,"sourceURL":"https://www.metmuseum.org/toah/ht/05/ssa.html"},{"id":"in-post-maurya","name":"孔雀之后诸国","start":-184,"end":319,"sourceURL":"https://www.metmuseum.org/toah/ht/05/ssa.html"},{"id":"in-maurya","name":"孔雀王朝","start":-322,"end":-184,"sourceURL":"https://www.metmuseum.org/toah/ht/04/ssa.html"},{"id":"in-early-states","name":"列国与摩揭陀","start":-799,"end":-320,"sourceURL":"https://www.metmuseum.org/toah/ht/04/ssa.html"},{"id":"in-vedic","name":"吠陀时期","start":-1499,"end":-499,"sourceURL":"https://www.metmuseum.org/toah/ht/04/ssa.html"},{"id":"in-harappan","name":"哈拉帕文明","start":-2999,"end":-1299,"sourceURL":"https://whc.unesco.org/en/list/1645/"},{"id":"in-prehistory","name":"史前与早期聚落","start":-19999,"end":-3000,"sourceURL":"https://whc.unesco.org/document/154601"}].map(period=>Object.freeze(period)));
+export const INDIA_PERIODS = Object.freeze([{"id":"all","name":"全部","start":-19999,"end":null,"navigationOnly":true,"sourceURL":"https://whc.unesco.org/document/154601"},{"id":"in-republic","name":"印度共和国","start":1950,"end":null,"startDate":"1950-01-26","sourceURL":"https://www.legislative.gov.in/static/uploads/2025/07/359f70a69695affb9d72f8393102bd2e.pdf"},{"id":"in-dominion","name":"印度自治领","start":1947,"end":1950,"startDate":"1947-08-15","endBefore":"1950-01-26","sourceURL":"https://www.legislation.gov.uk/ukpga/Geo6/10-11/30","endSourceURL":"https://www.legislative.gov.in/static/uploads/2025/07/359f70a69695affb9d72f8393102bd2e.pdf"},{"id":"in-british","name":"英属印度","start":1858,"end":1947,"startDate":"1858-09-02","endBefore":"1947-08-15","sourceURL":"https://www.legislation.gov.uk/ukpga/Vict/21-22/106/pdfs/ukpga_18580106_en.pdf","endSourceURL":"https://www.legislation.gov.uk/ukpga/Geo6/10-11/30"},{"id":"in-company","name":"殖民据点与公司统治","start":1498,"end":1858,"endBefore":"1858-09-02","sourceURL":"https://www.metmuseum.org/toah/ht/08/ssa.html","endSourceURL":"https://www.legislation.gov.uk/ukpga/Vict/21-22/106/pdfs/ukpga_18580106_en.pdf"},{"id":"in-regional","name":"区域王国与马拉塔","start":1400,"end":1858,"sourceURL":"https://www.metmuseum.org/toah/ht/08/ssa.html"},{"id":"in-mughal","name":"莫卧儿","start":1526,"end":1858,"sourceURL":"https://www.metmuseum.org/toah/ht/08/ssa.html"},{"id":"in-sur","name":"苏尔王朝","start":1540,"end":1555,"sourceURL":"https://www.metmuseum.org/toah/ht/08/ssa.html"},{"id":"in-sultanate","name":"德里苏丹国与北部诸国","start":1206,"end":1526,"sourceURL":"https://www.metmuseum.org/toah/ht/07/ssn.html"},{"id":"in-northeast","name":"东北与喜马拉雅诸国","start":600,"end":1947,"sourceURL":"https://whc.unesco.org/en/list/1711/"},{"id":"in-south","name":"南部王国与德干","start":500,"end":1800,"sourceURL":"https://www.metmuseum.org/toah/ht/06/sss.html"},{"id":"in-early-medieval","name":"中古早期诸国","start":500,"end":1205,"sourceURL":"https://www.metmuseum.org/toah/ht/06/ssn.html"},{"id":"in-gupta","name":"笈多时期","start":320,"end":550,"sourceURL":"https://www.metmuseum.org/toah/ht/05/ssa.html"},{"id":"in-early-south","name":"早期南部诸国","start":-599,"end":499,"sourceURL":"https://www.tnarch.gov.in/keeladi"},{"id":"in-post-maurya","name":"孔雀之后诸国","start":-184,"end":319,"sourceURL":"https://www.metmuseum.org/toah/ht/05/ssa.html"},{"id":"in-maurya","name":"孔雀王朝","start":-322,"end":-184,"sourceURL":"https://www.metmuseum.org/toah/ht/04/ssa.html"},{"id":"in-early-states","name":"列国与摩揭陀","start":-799,"end":-320,"sourceURL":"https://www.metmuseum.org/toah/ht/04/ssa.html"},{"id":"in-vedic","name":"吠陀时期","start":-1499,"end":-499,"sourceURL":"https://www.metmuseum.org/toah/ht/04/ssa.html"},{"id":"in-harappan","name":"哈拉帕文明","start":-2999,"end":-1299,"sourceURL":"https://whc.unesco.org/en/list/1645/"},{"id":"in-prehistory","name":"史前与早期聚落","start":-19999,"end":-599,"sourceURL":"https://whc.unesco.org/document/154601"}].map(period=>Object.freeze(period)));
+
+// Nepal groups regional coexistence, not historical borders. Shah begins with
+// the Gorkha kingdom (1559); it does not mean the valley was unified then.
+// Rana begins at the Kot political turning point, not abolition of Shah kingship.
+export const NEPAL_PERIODS = Object.freeze([{"id":"all","name":"全部","start":-1493,"end":null,"navigationOnly":true,"sourceURL":"https://www.nature.com/articles/s41467-022-28827-2"},{"id":"np-republic","name":"联邦民主共和国","start":2008,"end":null,"startDate":"2008-05-28","sourceURL":"https://digitallibrary.un.org/record/631478/files/S_2008_454-EN.pdf"},{"id":"np-monarchy","name":"君主制与民主转型","start":1951,"end":2008,"startDate":"1951-02-18","endBefore":"2008-05-28","sourceURL":"https://radionepalonline.com/en/2025/02/09/401561.html","endSourceURL":"https://digitallibrary.un.org/record/631478/files/S_2008_454-EN.pdf"},{"id":"np-rana","name":"拉纳时期","start":1846,"end":1951,"startDate":"1846-09-14","endBefore":"1951-02-18","sourceURL":"https://nepalica.hadw-bw.de/nepal/editions/show/2170","endSourceURL":"https://radionepalonline.com/en/2025/02/09/401561.html"},{"id":"np-shah","name":"沙阿王朝与统一","start":1559,"end":1846,"endBefore":"1846-09-14","sourceURL":"https://trade.ntb.gov.np/know-nepal/nepals-history/","endSourceURL":"https://nepalica.hadw-bw.de/nepal/editions/show/2170"},{"id":"np-malla","name":"马拉与区域王国","start":1200,"end":1769,"sourceURL":"https://whc.unesco.org/en/tentativelists/5263"},{"id":"np-medieval","name":"中古早期","start":750,"end":1199,"sourceURL":"https://tile.loc.gov/storage-services/master/gdc/gdcebookspublic/20/20/71/53/45/2020715345/2020715345.pdf"},{"id":"np-licchavi","name":"李查维时期","start":400,"end":749,"sourceURL":"https://siddham.network/object/ob02001a/?section=metadata"},{"id":"np-early","name":"史前与早期","start":-1493,"end":399,"sourceURL":"https://www.nature.com/articles/s41467-022-28827-2"}].map(period=>Object.freeze(period)));
+
+// Sri Lankan coastal administrations and inland kingdoms coexisted.
+// These are navigation groups, not assertions that one polity ruled the island.
+// Civil-date transitions distinguish takeover, dominion and the republics.
+export const SRI_LANKA_PERIODS = Object.freeze([{"id":"all","name":"全部","start":-46049,"end":null,"navigationOnly":true,"sourceURL":"https://www.nature.com/articles/s41467-019-08623-1"},{"id":"lk-second-republic","name":"第二共和国","start":1978,"end":null,"startDate":"1978-09-07","sourceURL":"https://www.parliament.lk/files/pdf/1978constitutionwithoutamendments.pdf"},{"id":"lk-first-republic","name":"第一共和国","start":1972,"end":1978,"startDate":"1972-05-22","endBefore":"1978-09-07","sourceURL":"https://www.mfa.gov.lk/en/about-us/history/milestone-list","endSourceURL":"https://www.parliament.lk/files/pdf/1978constitutionwithoutamendments.pdf"},{"id":"lk-dominion","name":"锡兰自治领","start":1948,"end":1972,"startDate":"1948-02-04","endBefore":"1972-05-22","sourceURL":"https://www.mfa.gov.lk/en/about-us/history/milestone-list","endSourceURL":"https://www.mfa.gov.lk/en/about-us/history/milestone-list"},{"id":"lk-british","name":"英国殖民时期","start":1796,"end":1948,"startDate":"1796-02-16","endBefore":"1948-02-04","sourceURL":"https://www.mq.edu.au/macquarie-archive/under/documents/1796/welsh.html","endSourceURL":"https://www.mfa.gov.lk/en/about-us/history/milestone-list"},{"id":"lk-dutch","name":"荷兰沿海统治","start":1638,"end":1796,"endBefore":"1796-02-16","sourceURL":"https://www.cbsl.gov.lk/en/node/235","endSourceURL":"https://www.mq.edu.au/macquarie-archive/under/documents/1796/welsh.html"},{"id":"lk-portuguese","name":"葡萄牙沿海扩张","start":1505,"end":1658,"sourceURL":"https://www.cbsl.gov.lk/en/node/235"},{"id":"lk-kandy","name":"康提王国","start":1469,"end":1815,"endBefore":"1815-03-02","sourceURL":"https://siddham.network/inscription/in03154/","endSourceURL":"https://www.lawnet.gov.lk/wp-content/uploads/2016/11/078-NLR-NLR-V-09-FERNANDO-v.-THE-MUNICIPAL-COUNCIL-OF-KANDY.pdf"},{"id":"lk-regional","name":"区域王国","start":1220,"end":1597,"sourceURL":"https://ccf.gov.lk/heritage-sites/dambadeniya/","endSourceURL":"https://www.kotte.mc.gov.lk/index.php?Itemid=176&id=26&lang=en&option=com_content&view=article"},{"id":"lk-polonnaruwa","name":"波隆纳鲁沃与朱罗时期","start":993,"end":1232,"sourceURL":"https://whc.unesco.org/en/list/201/","endSourceURL":"https://www.cbsl.gov.lk/en/node/235"},{"id":"lk-anuradhapura","name":"阿努拉德普勒时期","start":-399,"end":1017,"sourceURL":"https://www.cambridge.org/core/journals/cambridge-archaeological-journal/article/abs/passage-to-india-anuradhapura-and-the-early-use-of-the-brahmi-script/DAAA2514FB08E1DDE3FAFF2171AB097B","endSourceURL":"https://www.cbsl.gov.lk/en/node/235"},{"id":"lk-early","name":"史前与早期","start":-46049,"end":-400,"sourceURL":"https://www.nature.com/articles/s41467-019-08623-1"}].map(period=>Object.freeze(period)));
+
+// Bangladesh groups are chronological navigation, not reconstructed borders.
+// Partition and independence use exact civil dates; year-only records at a
+// transition need evidence of their period rather than an invented January date.
+export const BANGLADESH_PERIODS = Object.freeze([{"id":"all","name":"全部","start":-399,"end":null,"navigationOnly":true,"sourceURL":"https://archeologie.culture.gouv.fr/fr/mahasthan"},{"id":"bd-modern","name":"近现代","start":1947,"end":null,"navigationOnly":true,"startDate":"1947-08-15","sourceURL":"https://www.legislation.gov.uk/ukpga/1947/30/pdfs/ukpga_19470030_en.pdf"},{"id":"bd-independent","name":"独立孟加拉国","start":1971,"end":null,"startDate":"1971-03-26","sourceURL":"https://bdlaws.minlaw.gov.bd/act-367.html"},{"id":"bd-eastpakistan","name":"东孟加拉与东巴基斯坦","start":1947,"end":1971,"startDate":"1947-08-15","endBefore":"1971-03-26","sourceURL":"https://www.legislation.gov.uk/ukpga/1947/30/pdfs/ukpga_19470030_en.pdf","endSourceURL":"https://bdlaws.minlaw.gov.bd/act-367.html"},{"id":"bd-british","name":"公司与殖民时期","start":1757,"end":1947,"endBefore":"1947-08-15","sourceURL":"https://upload.wikimedia.org/wikipedia/commons/3/3a/A_Statistical_Account_of_Bengal_Vol_5_GoogleBooksID_RncDAAAAYAAJ.pdf","endSourceURL":"https://www.legislation.gov.uk/ukpga/1947/30/pdfs/ukpga_19470030_en.pdf"},{"id":"bd-mughal","name":"莫卧儿与纳瓦卜时期","start":1576,"end":1756,"sourceURL":"https://www.bmri.org.uk/articles/Muslim-Coins-Bengal.pdf"},{"id":"bd-sultanate","name":"苏丹国与区域政权","start":1204,"end":1575,"sourceURL":"https://www.bmri.org.uk/articles/Muslim-Coins-Bengal.pdf"},{"id":"bd-pala-sena","name":"波罗与塞纳时期","start":750,"end":1203,"sourceURL":"https://pjhc.nihcr.edu.pk/wp-content/uploads/2020/08/2-Bengal-under-the-Palas-and-Senas750-1204Syed-Umar-Hayat.pdf"},{"id":"bd-ancient","name":"早期古代","start":-399,"end":749,"sourceURL":"https://archeologie.culture.gouv.fr/fr/mahasthan"}].map(period=>Object.freeze(period)));
 
 const PERIOD_COUNTRIES = new Map([
   ...HISTORY_PERIODS.filter(p => !p.navigationOnly).map(p => [p.id, 'CN']),
@@ -606,8 +626,11 @@ const PERIOD_COUNTRIES = new Map([
   ...THAILAND_PERIODS.filter(p => !p.navigationOnly).map(p => [p.id, 'TH']),
   ...MYANMAR_PERIODS.filter(p => !p.navigationOnly).map(p => [p.id, 'MM']),
   ...INDIA_PERIODS.filter(p => !p.navigationOnly).map(p => [p.id, 'IN']),
+  ...NEPAL_PERIODS.filter(p => !p.navigationOnly).map(p => [p.id, 'NP']),
+  ...SRI_LANKA_PERIODS.filter(p => !p.navigationOnly).map(p => [p.id, 'LK']),
+  ...BANGLADESH_PERIODS.filter(p => !p.navigationOnly).map(p => [p.id, 'BD']),
 ]);
-const ERA_COUNTRIES = [...HISTORY_PERIODS, ...JAPAN_PERIODS, ...KOREA_PERIODS, ...NORTH_KOREA_PERIODS, ...MONGOLIA_PERIODS, ...VIETNAM_PERIODS, ...LAOS_PERIODS, ...CAMBODIA_PERIODS, ...THAILAND_PERIODS, ...MYANMAR_PERIODS, ...INDIA_PERIODS].filter(p => !p.navigationOnly);
+const ERA_COUNTRIES = [...HISTORY_PERIODS, ...JAPAN_PERIODS, ...KOREA_PERIODS, ...NORTH_KOREA_PERIODS, ...MONGOLIA_PERIODS, ...VIETNAM_PERIODS, ...LAOS_PERIODS, ...CAMBODIA_PERIODS, ...THAILAND_PERIODS, ...MYANMAR_PERIODS, ...INDIA_PERIODS, ...NEPAL_PERIODS, ...SRI_LANKA_PERIODS, ...BANGLADESH_PERIODS].filter(p => !p.navigationOnly);
 
 // This is a neutral navigation fallback, not a beginning of world history.
 // The caller extends it to include earlier records in the selected geography.
@@ -617,7 +640,7 @@ const WORLD_PERIODS = Object.freeze([
 
 /** Only offer period metadata associated with the selected country. */
 export function periodsForCountry(countryCode = 'CN') {
-  return countryCode === 'CN' ? HISTORY_PERIODS : countryCode === 'JP' ? JAPAN_PERIODS : countryCode === 'KR' ? KOREA_PERIODS : countryCode === 'KP' ? NORTH_KOREA_PERIODS : countryCode === 'MN' ? MONGOLIA_PERIODS : countryCode === 'VN' ? VIETNAM_PERIODS : countryCode === 'LA' ? LAOS_PERIODS : countryCode === 'KH' ? CAMBODIA_PERIODS : countryCode === 'TH' ? THAILAND_PERIODS : countryCode === 'MM' ? MYANMAR_PERIODS : countryCode === 'IN' ? INDIA_PERIODS : WORLD_PERIODS;
+  return countryCode === 'CN' ? HISTORY_PERIODS : countryCode === 'JP' ? JAPAN_PERIODS : countryCode === 'KR' ? KOREA_PERIODS : countryCode === 'KP' ? NORTH_KOREA_PERIODS : countryCode === 'MN' ? MONGOLIA_PERIODS : countryCode === 'VN' ? VIETNAM_PERIODS : countryCode === 'LA' ? LAOS_PERIODS : countryCode === 'KH' ? CAMBODIA_PERIODS : countryCode === 'TH' ? THAILAND_PERIODS : countryCode === 'MM' ? MYANMAR_PERIODS : countryCode === 'IN' ? INDIA_PERIODS : countryCode === 'NP' ? NEPAL_PERIODS : countryCode === 'LK' ? SRI_LANKA_PERIODS : countryCode === 'BD' ? BANGLADESH_PERIODS : WORLD_PERIODS;
 }
 
 function validCurrentYear(currentYear) {
@@ -668,11 +691,17 @@ export function periodForEvent(event,countryCode='CN') {
   // Japanese records must never be inferred as Chinese dynasties by year alone.
   const declaredCountry=PERIOD_COUNTRIES.get(event.periodId);
   if(declaredCountry&&declaredCountry!==countryCode)return null;
-  const eraCountries=new Set(ERA_COUNTRIES.filter(p=>event.era===p.name||event.era?.startsWith(p.name+' · ')).map(p=>PERIOD_COUNTRIES.get(p.id)));
-  // Shared labels such as prehistory cannot imply the first country's ownership.
-  if(!declaredCountry&&eraCountries.size&&!eraCountries.has(countryCode))return null;
   const range=eventStartRange(event);
   if(!range)return null;
+  const eraPeriods=ERA_COUNTRIES.filter(p=>event.era===p.name||event.era?.startsWith(p.name+' · '));
+  const eraCountries=new Set(eraPeriods.map(p=>PERIOD_COUNTRIES.get(p.id)));
+  // Shared labels cannot imply ownership by array order or fall through to an
+  // unrelated local era when their date fits only another country's chronology.
+  if(!declaredCountry&&eraCountries.size&&!eraCountries.has(countryCode))return null;
+  if(!declaredCountry&&eraCountries.size>1&&!eraPeriods.some(p=>{
+    const [start,end]=dateBounds(p);
+    return PERIOD_COUNTRIES.get(p.id)===countryCode&&range[1]>=start&&range[0]<end;
+  }))return null;
   const candidates=periodsForCountry(countryCode).filter(period=>{
     if(period.navigationOnly)return false;
     const [start,end]=dateBounds(period);return range[1]>=start&&range[0]<end;

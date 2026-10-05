@@ -23,7 +23,7 @@ test('Mongolian corpus uses independent periods and sourced geographic records',
     assert.ok(e.sources.some(s=>s.url===e.sourceUrl&&s.title===e.sourceTitle),e.id);
     if(e.date){const full=e.date.length===7?e.date+'-01':e.date;assert.equal(new Date(full).toISOString().slice(0,10),full,e.id);assert.equal(Number(e.date.slice(0,4)),e.year);assert.equal(e.precision,e.date.length===7?'month':'day');assert.ok(e.date<=data.meta.reviewedThrough);}else assert.equal(e.precision,'year');
   }
-  for(const [code,count]of [['CN',3117],['JP',1101],['KR',454],['KP',446],['MN',mongolia.length]])assert.equal(data.meta.collections.filter(c=>c.countryCode===code).reduce((n,c)=>n+c.events,0),count,code);
+  for(const [code,count]of [['CN',4825],['JP',1101],['KR',454],['KP',446],['MN',mongolia.length]])assert.equal(data.meta.collections.filter(c=>c.countryCode===code).reduce((n,c)=>n+c.events,0),count,code);
 });
 
 test('Mongolian constitutional dates split transition years without duplicate ownership',()=>{

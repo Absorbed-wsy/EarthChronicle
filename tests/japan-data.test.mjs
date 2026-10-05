@@ -40,7 +40,7 @@ test('Japanese history has independent eras, source-backed events and coherent m
   }
   assert.ok(sources.size>=260,'Japanese corpus must use diverse event-specific primary or institutional sources');
   for(const category of ['政治','制度','战争','外交','经济','社会','科技','文化','灾害','营建','建都'])assert.ok(japan.some(e=>e.category===category),category);
-  assert.equal(oldChina.length,3117,'existing Chinese selection must be retained');
+  assert.equal(oldChina.length,4825,'existing Chinese selection must be retained');
   assert.equal(data.meta.collections.filter(c=>c.countryCode==='CN').reduce((n,c)=>n+c.events,0),oldChina.length);
   assert.equal(data.meta.collections.filter(c=>c.countryCode==='JP').reduce((n,c)=>n+c.events,0),japan.length);
 });
@@ -99,7 +99,7 @@ test('Japanese institution and regional records use the actual start or decision
 
 test('Japanese archaeology preserves BCE conventions, approximate dates and independent country navigation',()=>{
   const first=japan.find(e=>e.id==='jp--6999-kakinoshima');assert.ok(first);assert.equal(first.date,null);assert.equal(first.precision,'year');assert.match(first.title,/约公元前7000年/);assert.match(first.locationNote,/考古约年/);
-  assert.deepEqual(periodBounds('jp-early',2026,'JP'),[-6999,538]);assert.deepEqual(periodBounds('all',2026,'JP'),[-6999,2026]);assert.deepEqual(periodBounds('all',2026,'CN'),[-769,2026]);
+  assert.deepEqual(periodBounds('jp-early',2026,'JP'),[-6999,538]);assert.deepEqual(periodBounds('all',2026,'JP'),[-6999,2026]);assert.deepEqual(periodBounds('all',2026,'CN'),[-17999,2026]);
   assert.equal(periodForEvent(first,'JP')?.id,'jp-early');assert.equal(periodForEvent(first,'CN'),null);
   for(const id of ['jp-275-hashihaka-tomb','jp-450-daisen-tomb','jp-525-imashirozuka-tomb']){const e=japan.find(e=>e.id===id);assert.ok(e);assert.match(e.title,/约/);assert.equal(e.date,null);assert.match(e.locationNote,/代表约年|代表年/);}
   const seal=japan.find(e=>e.id==='jp-57-na-gold-seal'),discovery=japan.find(e=>e.id==='jp-1784-gold-seal-discovery');assert.match(seal.locationNote,/后汉朝廷/);assert.equal(discovery.year,1784);assert.equal(discovery.periodId,'jp-edo');

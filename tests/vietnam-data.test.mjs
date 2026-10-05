@@ -21,7 +21,7 @@ test('Vietnam corpus provides independent periods, valid dates and sourced regio
   if(e.date){const full=e.date.length===7?e.date+'-01':e.date;assert.equal(new Date(full).toISOString().slice(0,10),full,e.id);assert.equal(Number(e.date.slice(0,4)),e.year);assert.equal(e.precision,e.date.length===7?'month':'day');assert.ok(e.date<=data.meta.reviewedThrough);}else assert.equal(e.precision,'year');
  }
  assert.ok(sources.size>=50);for(const category of ['政治','军事','外交','经济','社会','科技','文化','灾害'])assert.ok(vietnam.some(e=>e.category===category),category);
- for(const [c,count]of [['CN',3117],['JP',1101],['KR',454],['KP',446],['MN',451],['VN',vietnam.length]])assert.equal(data.meta.collections.filter(p=>p.countryCode===c).reduce((n,p)=>n+p.events,0),count,c);
+ for(const [c,count]of [['CN',4825],['JP',1101],['KR',454],['KP',446],['MN',451],['VN',vietnam.length]])assert.equal(data.meta.collections.filter(p=>p.countryCode===c).reduce((n,p)=>n+p.events,0),count,c);
 });
 test('Vietnam civil transitions preserve unique ownership and concurrent dynasty choices',()=>{
  assert.equal(periodForEvent({year:1945,date:'1945-09-01',periodId:'vn-colonial'},'VN')?.id,'vn-colonial');

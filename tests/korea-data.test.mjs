@@ -28,7 +28,7 @@ test('Korean corpus covers independent chronology, all geographic regions and di
   }
   assert.equal(regions.size,17);assert.ok(sources.size>=350);
   for(const category of ['政治','战争','外交','经济','社会','科技','文化','灾害','建都','营建','制度'])assert.ok(korea.some(e=>e.category===category),category);
-  for(const [code,count]of [['CN',3117],['JP',1101],['KR',korea.length]])assert.equal(data.meta.collections.filter(c=>c.countryCode===code).reduce((n,c)=>n+c.events,0),count,code);
+  for(const [code,count]of [['CN',4825],['JP',1101],['KR',korea.length]])assert.equal(data.meta.collections.filter(c=>c.countryCode===code).reduce((n,c)=>n+c.events,0),count,code);
 });
 
 test('Korean modern transitions partition events within the same year without duplicates',()=>{

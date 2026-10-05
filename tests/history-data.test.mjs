@@ -66,7 +66,7 @@ test('period collection counts and boundary labels agree with the exact-date nav
   }
 });
 
-test('county records have coherent geographic metadata and remain discoverable by their parent city',()=>{
+test('county and site references remain discoverable by country, region and local name',()=>{
   const places=new Map(data.places.map(place=>[place.id,place]));
   const countyPlaces=data.places.filter(place=>['county','site'].includes(place.adminLevel));
   const countyEvents=data.events.filter(event=>['county','site'].includes(places.get(event.placeId)?.adminLevel));
@@ -75,14 +75,14 @@ test('county records have coherent geographic metadata and remain discoverable b
   assert.equal(data.meta.countyCoverage.events,countyEvents.length);
   assert.equal(data.meta.countyCoverage.placesWithMultipleEvents,countyPlaces.filter(place=>countyEvents.filter(event=>event.placeId===place.id).length>=2).length);
   for(const place of countyPlaces){
-    assert.equal(place.countryCode,'CN',place.id);assert.match(place.regionCode,/^CN-(?:\d{2}|HK|MO)$/,place.id);
-    assert.ok(typeof place.parentCity==='string'&&place.parentCity.trim(),place.id);
+    assert.match(place.countryCode,/^[A-Z]{2}$/,place.id);assert.ok(place.regionCode.startsWith(place.countryCode+'-'),place.id);if(place.countryCode==='CN')assert.match(place.regionCode,/^CN-(?:\d{2}|HK|MO)$/,place.id);
+    if(place.countryCode==='CN'||place.parentCity!=null)assert.ok(typeof place.parentCity==='string'&&place.parentCity.trim(),place.id);
     assert.ok(place.description,place.id);
   }
   for(const event of countyEvents){
     const place=places.get(event.placeId);
-    assert.equal(eventMatches(event,{year:event.year,scope:'year',countryCode:'CN',region:place.regionCode,city:place.id,query:place.parentCity},places),true,event.id);
-    assert.equal(eventMatches(event,{year:(event.endYear??event.year)+1,scope:'year',countryCode:'CN',query:place.parentCity},places),false,event.id);
+    assert.equal(eventMatches(event,{year:event.year,scope:'year',countryCode:place.countryCode,region:place.regionCode,city:place.id,query:place.parentCity||place.name},places),true,event.id);
+    assert.equal(eventMatches(event,{year:(event.endYear??event.year)+1,scope:'year',countryCode:place.countryCode,query:place.parentCity||place.name},places),false,event.id);
   }
 });
 

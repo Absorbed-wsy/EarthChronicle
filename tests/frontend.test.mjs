@@ -248,7 +248,7 @@ test('library refresh clamps a deleted outer year and keeps a still-visible sele
   library.events.push(event('imported',1390));
   await ui.refreshLibrary();ui.renderHistory();
   assert.equal(ui.state.selected,'current');
-  ui.state.year=-9999;await ui.refreshLibrary();assert.equal(ui.state.year,-769);
+  ui.state.year=-19999;await ui.refreshLibrary();assert.equal(ui.state.year,-17999);
 });
 
 test('related-event navigation clears incompatible search and empty city results clear stale details',()=>{

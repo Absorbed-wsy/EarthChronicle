@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { HISTORY_PERIODS, periodBounds, periodsForCountry, periodsForYear, yearTickLabel } from '../public/history-navigation.js';
 
 test('whole history and recent history extend to the current year without requiring events', () => {
-  assert.deepEqual(periodBounds('all', 2026), [-769, 2026]);
+  assert.deepEqual(periodBounds('all', 2026), [-17999, 2026]);
   assert.deepEqual(periodBounds('modern', 2026), [1840, 2026]);
   assert.deepEqual(periodBounds('prc', 2027), [1949, 2027]);
   assert.deepEqual(periodBounds('missing', 2026), periodBounds('all', 2026));
@@ -64,5 +64,7 @@ test('navigation metadata is immutable, has unique ids and traceable sources', (
     assert.ok(period.end === null || period.end >= period.start);
     assert.equal(new URL(period.sourceURL).protocol, 'https:');
   }
-  assert.equal(HISTORY_PERIODS.some(period => ['xia', 'shang', 'western-zhou'].includes(period.id)), false);
+  for (const id of ['cn-prehistory', 'xia-shang', 'western-zhou']) assert.ok(HISTORY_PERIODS.some(period => period.id === id));
+  assert.deepEqual(periodBounds('western-zhou',2026),[-1045,-770]);
+  assert.deepEqual(periodBounds('xia-shang',2026),[-2069,-1046]);
 });

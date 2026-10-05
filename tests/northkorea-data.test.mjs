@@ -25,7 +25,7 @@ test('Northern Korean geography has independent sourced periods and keeps all pr
     if(e.date){const full=e.date.length===7?e.date+'-01':e.date;assert.equal(new Date(full).toISOString().slice(0,10),full,e.id);assert.equal(Number(e.date.slice(0,4)),e.year);assert.equal(e.precision,e.date.length===7?'month':'day');assert.ok(e.date<=data.meta.reviewedThrough);}else assert.equal(e.precision,'year');
   }
   assert.equal(regions.size,13);assert.ok(sources.size>=245);
-  for(const [code,count]of [['CN',3117],['JP',1101],['KR',454],['KP',north.length]])assert.equal(data.meta.collections.filter(c=>c.countryCode===code).reduce((n,c)=>n+c.events,0),count,code);
+  for(const [code,count]of [['CN',4825],['JP',1101],['KR',454],['KP',north.length]])assert.equal(data.meta.collections.filter(c=>c.countryCode===code).reduce((n,c)=>n+c.events,0),count,code);
 });
 
 test('Northern modern periods split boundary years on the correct establishment days',()=>{
